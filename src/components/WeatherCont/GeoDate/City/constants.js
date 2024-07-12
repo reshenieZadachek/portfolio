@@ -1,0 +1,1 @@
+export const OPENWEATHERMAP_API_KEY = 'bfdd7c03acfd5fc48e038e266bb49bdf';

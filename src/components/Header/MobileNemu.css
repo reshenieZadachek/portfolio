@@ -1,0 +1,9 @@
+.MobileNemu{
+    padding: 10px;
+    border: 2px solid #6abbf1;
+    border-radius: 20px;
+    width: 100%;
+}
+.MobileNemu:active{
+    background-color: #6abbf1;
+}
