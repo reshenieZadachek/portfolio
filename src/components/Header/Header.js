@@ -72,7 +72,7 @@ const Header = memo(() => {
   }
   return (
     <HeaderContainer>
-      <Link style={{padding: '5px'}} to={'/'}><Logo>DevPortfolio</Logo></Link>
+      <Link style={{padding: '5px'}} to={MAIN_ROUTE}><Logo>DevPortfolio</Logo></Link>
       <Nav>
         <Link to={MAIN_ROUTE}>Главная</Link>
         <Link to={ABOUTME_ROUTE}>Обо мне</Link>
