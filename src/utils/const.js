@@ -1,12 +1,12 @@
-export const  MAIN_ROUTE = '/'
+export const  MAIN_ROUTE = '/portfolio'
 
-export const WEATHER_ROUTE = '/weather'
-export const LETTER_ROUTE = '/letter'
-export const PYATNASHKU_ROUTE = '/pyatnashki'
-export const KEYBOARDTRAINER_ROUTE = '/keyboardtrainer'
-export const MUSIC_ROUTE = '/music'
+export const WEATHER_ROUTE = MAIN_ROUTE + '/weather'
+export const LETTER_ROUTE = MAIN_ROUTE + '/letter'
+export const PYATNASHKU_ROUTE = MAIN_ROUTE + '/pyatnashki'
+export const KEYBOARDTRAINER_ROUTE = MAIN_ROUTE + '/keyboardtrainer'
+export const MUSIC_ROUTE = MAIN_ROUTE + '/music'
 
-export const ABOUTME_ROUTE = '/aboutme'
+export const ABOUTME_ROUTE = MAIN_ROUTE + '/aboutme'
 
 export const MS_ROUTE = 'https://moneyslide.ru/'
 
