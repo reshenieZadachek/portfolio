@@ -45,7 +45,7 @@ const Footer = () => {
     <FooterContainer>
       <SocialLinks>
         <span><FaGithub style={{backgroundColor: 'white', color: ghColor, borderRadius: '50%',}}/><SocialLinksEl hoverColor={ghColor} href="https://github.com/reshenieZadachek" target="_blank" rel="noopener noreferrer">GitHub</SocialLinksEl></span>
-        <span><BiLogoTelegram style={{color: tgColor,}} /><SocialLinksEl hoverColor={tgColor} href="https://t.me/nogaOli" target="_blank" rel="noopener noreferrer">Telegram</SocialLinksEl></span>
+        <span><BiLogoTelegram style={{color: tgColor,}} /><SocialLinksEl hoverColor={tgColor} href="https://t.me/JunDevReact" target="_blank" rel="noopener noreferrer">Telegram</SocialLinksEl></span>
         <span><BiLogoGmail style={{color: gmailColor,}} /><SocialLinksEl hoverColor={gmailColor} href="mailto:solominka25@gmail.com?subject=Портфолио&body=Привет, увидел твое портфолио и хотел бы узнать у тебя" target="_blank" rel="noopener noreferrer">Gmail</SocialLinksEl></span>
       </SocialLinks>
     </FooterContainer>
