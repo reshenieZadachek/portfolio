@@ -130,7 +130,7 @@ const City = ({ onWeatherUpdate }) => {
     setLoading(true);
   setError(null);
   try {
-    let url = `http://api.openweathermap.org/data/2.5/forecast?appid=${OPENWEATHERMAP_API_KEY}&units=metric&lang=ru`;
+    let url = `https://api.openweathermap.org/data/2.5/forecast?appid=${OPENWEATHERMAP_API_KEY}&units=metric&lang=ru`;
     if (typeof query === 'string') {
       url += `&q=${query}`;
     } else {
