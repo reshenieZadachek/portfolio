@@ -66,9 +66,9 @@ function CameraController({ isAccelerometerMode, deviceOrientation, userLocation
           (targetRotation.z - currentRotation.z) * 0.1
         );
 
-        camera.rotation.x += velocity.current.x;
-        camera.rotation.y += velocity.current.y;
-        camera.rotation.z += velocity.current.z;
+        camera.rotation.x = velocity.current.x;
+        camera.rotation.y = velocity.current.y;
+        camera.rotation.z = velocity.current.z;
 
         // Затухание скорости
         velocity.current.multiplyScalar(0.95);
