@@ -1,6 +1,6 @@
 import WeatherPage from "./page/WeatherPage"
 import Index from "./page/Index"
-import { ABOUTME_ROUTE, KEYBOARDTRAINER_ROUTE, LETTER_ROUTE, MAIN_ROUTE, MUSIC_ROUTE, PYATNASHKU_ROUTE, WEATHER_ROUTE } from "./utils/const"
+import { ABOUTME_ROUTE, KEYBOARDTRAINER_ROUTE, LETTER_ROUTE, MAIN_ROUTE, MUSIC_ROUTE, PYATNASHKU_ROUTE, STARMAP_ROUTE, WEATHER_ROUTE } from "./utils/const"
 import LetterPage from "./page/LetterPage"
 import Pyatnashki from "./page/Pyatnashki"
 import KeyboardTrainer from "./page/KeyboardTrainer"
@@ -12,6 +12,7 @@ import track4 from './components/MusicPlayer/sound/track4.mp3';
 import track5 from './components/MusicPlayer/sound/track5.mp3';
 import track6 from './components/MusicPlayer/sound/track6.mp3';
 import AboutMe from "./page/AboutMe"
+import StarMap from "./page/StarMap"
 
   const initialTracks = [
     { id: 1, title: 'Track 1', artist: 'Artist 1', src: track1 },
@@ -47,6 +48,10 @@ export const publicRoutes = [
         path: MUSIC_ROUTE,
         Component: MusicPlayer,
         tracks: initialTracks
+    },
+    {
+        path: STARMAP_ROUTE,
+        Component: StarMap,
     },
     {
         path: ABOUTME_ROUTE,

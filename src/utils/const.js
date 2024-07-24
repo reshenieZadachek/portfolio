@@ -5,6 +5,7 @@ export const LETTER_ROUTE = MAIN_ROUTE + '/letter'
 export const PYATNASHKU_ROUTE = MAIN_ROUTE + '/pyatnashki'
 export const KEYBOARDTRAINER_ROUTE = MAIN_ROUTE + '/keyboardtrainer'
 export const MUSIC_ROUTE = MAIN_ROUTE + '/music'
+export const STARMAP_ROUTE = MAIN_ROUTE + '/starmap'
 
 export const ABOUTME_ROUTE = MAIN_ROUTE + '/aboutme'
 
