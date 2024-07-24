@@ -6,29 +6,34 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
   const { scene, camera } = useThree();
   const initialOrientationRef = useRef(null);
   const lastUpdateTime = useRef(Date.now());
-  const updateInterval = 50; // ms
+  const updateInterval = 16; // ~60 fps
 
   useEffect(() => {
+    // Сбрасываем начальную ориентацию при включении/выключении режима акселерометра
     if (isAccelerometerMode && userLocation) {
-      // Устанавливаем начальную ориентацию
-      initialOrientationRef.current = new THREE.Euler(
-        THREE.MathUtils.degToRad(deviceOrientation.beta),
-        THREE.MathUtils.degToRad(deviceOrientation.alpha),
-        THREE.MathUtils.degToRad(-deviceOrientation.gamma),
-        'YXZ'
-      );
-
-      // Устанавливаем камеру в зенит
-      camera.position.set(0, 0, 0);
-      camera.lookAt(0, 1, 0);
+      initialOrientationRef.current = null;
     }
-  }, [isAccelerometerMode, userLocation, deviceOrientation, camera]);
+  }, [isAccelerometerMode, userLocation]);
 
   useFrame(() => {
-    if (isAccelerometerMode && userLocation && initialOrientationRef.current) {
+    if (isAccelerometerMode && userLocation) {
       const currentTime = Date.now();
       if (currentTime - lastUpdateTime.current < updateInterval) return;
       lastUpdateTime.current = currentTime;
+
+      // Устанавливаем начальную ориентацию, если она еще не установлена
+      if (!initialOrientationRef.current) {
+        initialOrientationRef.current = new THREE.Euler(
+          THREE.MathUtils.degToRad(deviceOrientation.beta),
+          THREE.MathUtils.degToRad(deviceOrientation.alpha),
+          THREE.MathUtils.degToRad(-deviceOrientation.gamma),
+          'YXZ'
+        );
+
+        // Устанавливаем камеру в зенит
+        camera.position.set(0, 0, 0);
+        camera.lookAt(0, 1, 0);
+      }
 
       // Вычисляем текущую ориентацию устройства
       const currentOrientation = new THREE.Euler(
