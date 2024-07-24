@@ -165,10 +165,11 @@ const ConstellationLines = React.memo(({ stars, lines, radius, color }) => {
   );
 });
 
-function CameraController({ isAccelerometerMode, initialRotation }) {
+function CameraController({ isAccelerometerMode, initialRotation, sensitivity = 1 }) {
   const { camera } = useThree();
   const [deviceOrientation, setDeviceOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
   const initialRotationRef = useRef(new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ'));
+  const lastAlpha = useRef(0);
 
   useEffect(() => {
     if (isAccelerometerMode) {
@@ -209,24 +210,27 @@ function CameraController({ isAccelerometerMode, initialRotation }) {
       const betaRad = THREE.MathUtils.degToRad(beta);
       const gammaRad = THREE.MathUtils.degToRad(gamma);
 
+      // Вычисляем изменение alpha (вращение вокруг вертикальной оси)
+      const deltaAlpha = alphaRad - lastAlpha.current;
+      lastAlpha.current = alphaRad;
+
       // Создаем новый объект Euler для текущей ориентации устройства
       const deviceEuler = new THREE.Euler(
-        betaRad,
-        alphaRad,
-        -gammaRad,
+        betaRad * sensitivity,
+        camera.rotation.y - deltaAlpha * sensitivity,
+        -gammaRad * sensitivity,
         'YXZ'
       );
 
       // Применяем начальное вращение
       deviceEuler.x += initialRotationRef.current.x;
-      deviceEuler.y += initialRotationRef.current.y;
       deviceEuler.z += initialRotationRef.current.z;
 
       // Ограничиваем вращение вокруг оси X (вверх-вниз)
       deviceEuler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, deviceEuler.x));
 
       // Применяем новую ориентацию к камере
-      camera.setRotationFromEuler(deviceEuler);
+      camera.rotation.set(deviceEuler.x, deviceEuler.y, deviceEuler.z);
     }
   });
 
