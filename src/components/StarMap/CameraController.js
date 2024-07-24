@@ -36,9 +36,9 @@ function CameraController({ isAccelerometerMode, deviceOrientation, userLocation
       );
 
       // Применяем плавный переход к целевой ориентации
-      camera.rotation.x += (targetRotation.current.x - camera.rotation.x) * smoothFactor;
-      camera.rotation.y += (targetRotation.current.y - camera.rotation.y) * smoothFactor;
-      camera.rotation.z += (targetRotation.current.z - camera.rotation.z) * smoothFactor;
+      camera.rotation.x += (targetRotation.current.y - camera.rotation.y) * smoothFactor;
+      camera.rotation.y += (targetRotation.current.z - camera.rotation.z) * smoothFactor;
+      camera.rotation.z += (targetRotation.current.x - camera.rotation.x) * smoothFactor;
     }
   });
 
