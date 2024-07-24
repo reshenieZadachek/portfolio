@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
 import * as THREE from 'three';
-import CameraController from '../components/StarMap/CameraController';
+import StarMapController from '../components/StarMap/CameraController';
 
 
 const toSpherical = (radius, ra, dec) => {
@@ -279,7 +279,7 @@ function StarMap() {
             enableZoom={!isAccelerometerMode}
           />
         )}
-        <CameraController 
+        <StarMapController 
           isAccelerometerMode={isAccelerometerMode}
           deviceOrientation={deviceOrientation}
           userLocation={userLocation}

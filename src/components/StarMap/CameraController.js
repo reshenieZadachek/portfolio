@@ -1,78 +1,63 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-function CameraController({ isAccelerometerMode, deviceOrientation, userLocation }) {
-  const { camera } = useThree();
-  const [isCalibrated, setIsCalibrated] = useState(false);
-  const initialOrientation = useRef(new THREE.Quaternion());
-  const smoothedOrientation = useRef(new THREE.Quaternion());
+function StarMapController({ isAccelerometerMode, deviceOrientation, userLocation }) {
+  const { scene, camera } = useThree();
+  const initialOrientationRef = useRef(null);
   const lastUpdateTime = useRef(Date.now());
-  const velocity = useRef(new THREE.Vector3());
-  const smoothFactor = 0.02;
-  const movementThreshold = 2; // градусов
-  const updateInterval = 100; // мс
+  const updateInterval = 50; // ms
 
   useEffect(() => {
-    if (isAccelerometerMode && userLocation && !isCalibrated) {
-      const initQuat = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(
-          THREE.MathUtils.degToRad(deviceOrientation.beta),
-          THREE.MathUtils.degToRad(deviceOrientation.alpha),
-          THREE.MathUtils.degToRad(-deviceOrientation.gamma),
-          'YXZ'
-        )
+    if (isAccelerometerMode && userLocation) {
+      // Устанавливаем начальную ориентацию
+      initialOrientationRef.current = new THREE.Euler(
+        THREE.MathUtils.degToRad(deviceOrientation.beta),
+        THREE.MathUtils.degToRad(deviceOrientation.alpha),
+        THREE.MathUtils.degToRad(-deviceOrientation.gamma),
+        'YXZ'
       );
-      initialOrientation.current.copy(initQuat);
-      smoothedOrientation.current.copy(initQuat);
-      setIsCalibrated(true);
+
+      // Устанавливаем камеру в зенит
+      camera.position.set(0, 0, 0);
+      camera.lookAt(0, 1, 0);
     }
-  }, [isAccelerometerMode, userLocation, deviceOrientation, isCalibrated]);
+  }, [isAccelerometerMode, userLocation, deviceOrientation, camera]);
 
   useFrame(() => {
-    if (isAccelerometerMode && userLocation && isCalibrated) {
+    if (isAccelerometerMode && userLocation && initialOrientationRef.current) {
       const currentTime = Date.now();
       if (currentTime - lastUpdateTime.current < updateInterval) return;
       lastUpdateTime.current = currentTime;
 
-      const currentQuat = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(
-          THREE.MathUtils.degToRad(deviceOrientation.beta),
-          THREE.MathUtils.degToRad(deviceOrientation.alpha),
-          THREE.MathUtils.degToRad(-deviceOrientation.gamma),
-          'YXZ'
-        )
+      // Вычисляем текущую ориентацию устройства
+      const currentOrientation = new THREE.Euler(
+        THREE.MathUtils.degToRad(deviceOrientation.beta),
+        THREE.MathUtils.degToRad(deviceOrientation.alpha),
+        THREE.MathUtils.degToRad(-deviceOrientation.gamma),
+        'YXZ'
       );
 
-      const diffQuat = new THREE.Quaternion().multiplyQuaternions(currentQuat, initialOrientation.current.invert());
-      const angleDiff = 2 * Math.acos(diffQuat.w) * THREE.MathUtils.RAD2DEG;
+      // Вычисляем разницу между текущей и начальной ориентацией
+      const deltaRotation = new THREE.Euler(
+        currentOrientation.x - initialOrientationRef.current.x,
+        currentOrientation.y - initialOrientationRef.current.y,
+        currentOrientation.z - initialOrientationRef.current.z,
+        'YXZ'
+      );
 
-      if (angleDiff > movementThreshold) {
-        smoothedOrientation.current.slerp(currentQuat, smoothFactor);
+      // Применяем вращение к сцене
+      scene.rotation.x = -deltaRotation.x;
+      scene.rotation.y = -deltaRotation.y;
+      scene.rotation.z = -deltaRotation.z;
 
-        const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
-        const latitudeRad = THREE.MathUtils.degToRad(userLocation.latitude);
-        const correctionQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(latitudeRad - Math.PI/2, siderealTime, 0, 'YXZ'));
-
-        const targetQuat = new THREE.Quaternion().multiplyQuaternions(correctionQuat, smoothedOrientation.current).invert();
-
-        // Применяем инерцию
-        const currentRotation = new THREE.Euler().setFromQuaternion(camera.quaternion);
-        const targetRotation = new THREE.Euler().setFromQuaternion(targetQuat);
-        
-        velocity.current.set(
-          (targetRotation.x - currentRotation.x) * 1,
-          (targetRotation.y - currentRotation.y) * 1,
-          (targetRotation.z - currentRotation.z) * 1
-        );
-
-        camera.rotation.x = velocity.current.x;
-        camera.rotation.y = velocity.current.y;
-        camera.rotation.z = velocity.current.z;
-
-        // Затухание скорости
-        velocity.current.multiplyScalar(0.95);
-      }
+      // Учитываем географическое положение пользователя
+      const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
+      const latitudeRotation = THREE.MathUtils.degToRad(90 - userLocation.latitude);
+      
+      // Применяем дополнительное вращение для учета географического положения
+      scene.rotateOnAxis(new THREE.Vector3(0, 1, 0), siderealTime);
+      scene.rotateOnAxis(new THREE.Vector3(1, 0, 0), latitudeRotation);
     }
   });
 
@@ -92,4 +77,4 @@ function calculateSiderealTime(longitude, date) {
   return THREE.MathUtils.degToRad(siderealTime + longitude);
 }
 
-export default CameraController;
+export default StarMapController;
