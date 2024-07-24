@@ -212,9 +212,13 @@ function CameraController({ isAccelerometerMode, initialRotation }) {
       const betaRad = THREE.MathUtils.degToRad(beta);
       const gammaRad = THREE.MathUtils.degToRad(gamma);
 
-      // Создание кватерниона из углов Эйлера
-      // Меняем местами alpha (вращение вокруг вертикальной оси) и gamma (вращение как стрелка часов)
-      const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(betaRad, -gammaRad, alphaRad, 'YXZ'));
+      // Создаем отдельные кватернионы для каждого вращения
+      const qX = new THREE.Quaternion().setFromEuler(new THREE.Euler(betaRad, 0, 0, 'XYZ'));
+      const qY = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, alphaRad, 0, 'XYZ'));
+      const qZ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -gammaRad, 'XYZ'));
+
+      // Комбинируем вращения
+      const quaternion = new THREE.Quaternion().multiplyQuaternions(qY, qX).multiply(qZ);
       
       // Применение начального кватерниона
       quaternion.multiply(initialQuaternion.current);
