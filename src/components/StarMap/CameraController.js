@@ -1,59 +1,73 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 function CameraController({ isAccelerometerMode, deviceOrientation, userLocation }) {
   const { camera } = useThree();
-  const targetQuaternion = useRef(new THREE.Quaternion());
-  const smoothFactor = 0.05; // Уменьшили фактор сглаживания для более плавного движения
-  const previousOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
-  const orientationThreshold = 0.1; // Пороговое значение для фильтрации малых изменений
+  const [isCalibrated, setIsCalibrated] = useState(false);
+  const initialOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
+  const smoothedOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
+  const lastUpdateTime = useRef(Date.now());
+  const smoothFactor = 0.1;
+  const movementThreshold = 0.5; // градусов
 
   useEffect(() => {
-    if (isAccelerometerMode && userLocation) {
-      camera.rotation.set(0, 0, 0);
-      camera.quaternion.setFromEuler(camera.rotation);
+    if (isAccelerometerMode && userLocation && !isCalibrated) {
+      // Калибровка начального положения
+      initialOrientation.current = { ...deviceOrientation };
+      smoothedOrientation.current = { ...deviceOrientation };
+      setIsCalibrated(true);
     }
-  }, [isAccelerometerMode, userLocation, camera]);
+  }, [isAccelerometerMode, userLocation, deviceOrientation, isCalibrated]);
 
-  const lowPassFilter = (newValue, oldValue, alpha = 0.2) => {
-    return oldValue + alpha * (newValue - oldValue);
+  const smoothOrientation = (newOrientation) => {
+    const currentTime = Date.now();
+    const deltaTime = (currentTime - lastUpdateTime.current) / 1000; // в секундах
+    lastUpdateTime.current = currentTime;
+
+    const alphaDiff = getShortestRotation(newOrientation.alpha, smoothedOrientation.current.alpha);
+    const betaDiff = newOrientation.beta - smoothedOrientation.current.beta;
+    const gammaDiff = newOrientation.gamma - smoothedOrientation.current.gamma;
+
+    smoothedOrientation.current = {
+      alpha: smoothedOrientation.current.alpha + alphaDiff * smoothFactor * deltaTime,
+      beta: smoothedOrientation.current.beta + betaDiff * smoothFactor * deltaTime,
+      gamma: smoothedOrientation.current.gamma + gammaDiff * smoothFactor * deltaTime
+    };
+
+    return smoothedOrientation.current;
+  };
+
+  const getShortestRotation = (angle1, angle2) => {
+    let diff = angle1 - angle2;
+    while (diff < -180) diff += 360;
+    while (diff > 180) diff -= 360;
+    return diff;
   };
 
   useFrame(() => {
-    if (isAccelerometerMode && userLocation) {
-      let { alpha, beta, gamma } = deviceOrientation;
-      
-      // Применяем фильтр низких частот и пороговую фильтрацию
-      alpha = Math.abs(alpha - previousOrientation.current.alpha) > orientationThreshold
-        ? lowPassFilter(alpha, previousOrientation.current.alpha)
-        : previousOrientation.current.alpha;
-      beta = Math.abs(beta - previousOrientation.current.beta) > orientationThreshold
-        ? lowPassFilter(beta, previousOrientation.current.beta)
-        : previousOrientation.current.beta;
-      gamma = Math.abs(gamma - previousOrientation.current.gamma) > orientationThreshold
-        ? lowPassFilter(gamma, previousOrientation.current.gamma)
-        : previousOrientation.current.gamma;
+    if (isAccelerometerMode && userLocation && isCalibrated) {
+      const smoothed = smoothOrientation(deviceOrientation);
 
-      previousOrientation.current = { alpha, beta, gamma };
+      // Проверяем, превышает ли изменение пороговое значение
+      if (Math.abs(getShortestRotation(smoothed.alpha, initialOrientation.current.alpha)) > movementThreshold ||
+          Math.abs(smoothed.beta - initialOrientation.current.beta) > movementThreshold ||
+          Math.abs(smoothed.gamma - initialOrientation.current.gamma) > movementThreshold) {
 
-      const alphaRad = THREE.MathUtils.degToRad(alpha);
-      const betaRad = THREE.MathUtils.degToRad(beta);
-      const gammaRad = THREE.MathUtils.degToRad(gamma);
+        const alphaRad = THREE.MathUtils.degToRad(smoothed.alpha - initialOrientation.current.alpha);
+        const betaRad = THREE.MathUtils.degToRad(smoothed.beta - initialOrientation.current.beta);
+        const gammaRad = THREE.MathUtils.degToRad(smoothed.gamma - initialOrientation.current.gamma);
 
-      const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
-      const latitudeRad = THREE.MathUtils.degToRad(userLocation.latitude);
+        const deviceQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ'));
 
-      const deviceQuaternion = new THREE.Quaternion()
-        .setFromEuler(new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ'));
+        const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
+        const latitudeRad = THREE.MathUtils.degToRad(userLocation.latitude);
+        const correctionQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(latitudeRad - Math.PI/2, siderealTime, 0, 'YXZ'));
 
-      const correctionQuaternion = new THREE.Quaternion()
-        .setFromEuler(new THREE.Euler(latitudeRad - Math.PI/2, siderealTime, 0, 'YXZ'));
+        const targetQuaternion = new THREE.Quaternion().multiplyQuaternions(correctionQuaternion, deviceQuaternion).invert();
 
-      targetQuaternion.current.multiplyQuaternions(correctionQuaternion, deviceQuaternion);
-      targetQuaternion.current.invert();
-
-      camera.quaternion.slerp(targetQuaternion.current, smoothFactor);
+        camera.quaternion.slerp(targetQuaternion, 0.1);
+      }
     }
   });
 
