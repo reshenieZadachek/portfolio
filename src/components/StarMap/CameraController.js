@@ -4,18 +4,13 @@ import * as THREE from 'three';
 
 function CameraController({ isAccelerometerMode, deviceOrientation, userLocation }) {
   const { camera } = useThree();
-  const targetRotation = useRef(new THREE.Quaternion());
-  const initialRotation = useRef(new THREE.Quaternion());
-  const smoothFactor = 0.1; // Smoothing factor for movements (0-1)
+  const targetRotation = useRef(new THREE.Euler());
+  const smoothFactor = 0.1; // Фактор сглаживания движений (0-1)
 
   useEffect(() => {
     if (isAccelerometerMode && userLocation) {
-      // Set initial camera orientation
-      const initialQuat = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(0, -Math.PI / 2, 0, 'YXZ')
-      );
-      initialRotation.current.copy(initialQuat);
-      camera.quaternion.copy(initialRotation.current);
+      // Устанавливаем начальную ориентацию камеры
+      camera.rotation.set(0, 0, 0);
     }
   }, [isAccelerometerMode, userLocation, camera]);
 
@@ -23,38 +18,34 @@ function CameraController({ isAccelerometerMode, deviceOrientation, userLocation
     if (isAccelerometerMode && userLocation) {
       const { alpha, beta, gamma } = deviceOrientation;
       
-      // Convert angles to radians
+      // Преобразуем углы в радианы
       const alphaRad = THREE.MathUtils.degToRad(alpha);
       const betaRad = THREE.MathUtils.degToRad(beta);
       const gammaRad = THREE.MathUtils.degToRad(gamma);
 
-      // Calculate sidereal time
+      // Вычисляем звёздное время
       const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
       const latitudeRad = THREE.MathUtils.degToRad(userLocation.latitude);
 
-      // Create quaternion for device orientation
-      const deviceQuaternion = new THREE.Quaternion()
-        .setFromEuler(new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ'));
+      // Устанавливаем целевую ориентацию камеры
+      targetRotation.current.set(
+        betaRad - Math.PI/2, // Наклон вверх/вниз
+        alphaRad + siderealTime, // Поворот по горизонтали с учетом звездного времени
+        -gammaRad, // Поворот вокруг оси просмотра
+        'YXZ' // Порядок применения вращений
+      );
 
-      // Create quaternion for correction based on geographical location and time
-      const correctionQuaternion = new THREE.Quaternion()
-        .setFromEuler(new THREE.Euler(-latitudeRad, -siderealTime, 0, 'YXZ'));
-
-      // Combine quaternions
-      targetRotation.current.multiplyQuaternions(correctionQuaternion, deviceQuaternion);
-
-      // Apply initial orientation as base
-      targetRotation.current.multiply(initialRotation.current);
-
-      // Apply smooth transition to target orientation
-      camera.quaternion.slerp(targetRotation.current, smoothFactor);
+      // Применяем плавный переход к целевой ориентации
+      camera.rotation.x += (targetRotation.current.x - camera.rotation.x) * smoothFactor;
+      camera.rotation.y += (targetRotation.current.y - camera.rotation.y) * smoothFactor;
+      camera.rotation.z += (targetRotation.current.z - camera.rotation.z) * smoothFactor;
     }
   });
 
   return null;
 }
 
-// Function to calculate sidereal time
+// Функция для вычисления звёздного времени
 function calculateSiderealTime(longitude, date) {
   const J2000 = new Date('2000-01-01T12:00:00Z');
   const julianDays = (date - J2000) / (1000 * 60 * 60 * 24);
