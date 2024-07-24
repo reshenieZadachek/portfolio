@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
 import * as THREE from 'three';
+import CameraController from '../components/StarMap/CameraController';
 
 
 const toSpherical = (radius, ra, dec) => {
@@ -164,78 +165,6 @@ const ConstellationLines = React.memo(({ stars, lines, radius, color }) => {
     </group>
   );
 });
-
-function CameraController({ isAccelerometerMode, initialRotation, sensitivity = 1 }) {
-  const { camera } = useThree();
-  const [deviceOrientation, setDeviceOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
-  const initialRotationRef = useRef(new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ'));
-  const lastAlpha = useRef(0);
-
-  useEffect(() => {
-    if (isAccelerometerMode) {
-      const handleOrientation = (event) => {
-        if (event.alpha !== null && event.beta !== null && event.gamma !== null) {
-          setDeviceOrientation({
-            alpha: event.alpha,
-            beta: event.beta,
-            gamma: event.gamma
-          });
-        }
-      };
-
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        DeviceOrientationEvent.requestPermission()
-          .then(permissionState => {
-            if (permissionState === 'granted') {
-              window.addEventListener('deviceorientation', handleOrientation, true);
-            } else {
-              console.error('Permission to access device orientation was denied');
-            }
-          })
-          .catch(console.error);
-      } else {
-        window.addEventListener('deviceorientation', handleOrientation, true);
-      }
-
-      return () => window.removeEventListener('deviceorientation', handleOrientation, true);
-    }
-  }, [isAccelerometerMode]);
-
-  useFrame(() => {
-    if (isAccelerometerMode) {
-      const { alpha, beta, gamma } = deviceOrientation;
-      
-      // Преобразование углов в радианы
-      const alphaRad = THREE.MathUtils.degToRad(alpha);
-      const betaRad = THREE.MathUtils.degToRad(beta);
-      const gammaRad = THREE.MathUtils.degToRad(gamma);
-
-      // Вычисляем изменение alpha (вращение вокруг вертикальной оси)
-      const deltaAlpha = alphaRad - lastAlpha.current;
-      lastAlpha.current = alphaRad;
-
-      // Создаем новый объект Euler для текущей ориентации устройства
-      const deviceEuler = new THREE.Euler(
-        betaRad * sensitivity,
-        camera.rotation.y - deltaAlpha * sensitivity,
-        -gammaRad * sensitivity,
-        'YXZ'
-      );
-
-      // Применяем начальное вращение
-      deviceEuler.x += initialRotationRef.current.x;
-      deviceEuler.z += initialRotationRef.current.z;
-
-      // Ограничиваем вращение вокруг оси X (вверх-вниз)
-      deviceEuler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, deviceEuler.x));
-
-      // Применяем новую ориентацию к камере
-      camera.rotation.set(deviceEuler.x, deviceEuler.y, deviceEuler.z);
-    }
-  });
-
-  return null;
-}
 
 function StarMap() {
   const [selectedConstellation, setSelectedConstellation] = useState(null);
