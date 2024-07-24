@@ -167,8 +167,9 @@ const ConstellationLines = React.memo(({ stars, lines, radius, color }) => {
 
 function CameraController({ isAccelerometerMode, initialRotation }) {
   const { camera } = useThree();
-  const [rotation, setRotation] = useState(initialRotation);
+  const [deviceOrientation, setDeviceOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
   const initialQuaternion = useRef(new THREE.Quaternion());
+  const targetQuaternion = useRef(new THREE.Quaternion());
 
   useEffect(() => {
     if (isAccelerometerMode) {
@@ -176,14 +177,11 @@ function CameraController({ isAccelerometerMode, initialRotation }) {
 
       const handleOrientation = (event) => {
         if (event.alpha !== null && event.beta !== null && event.gamma !== null) {
-          const alpha = THREE.MathUtils.degToRad(event.alpha); // Z-axis rotation
-          const beta = THREE.MathUtils.degToRad(event.beta); // X-axis rotation
-          const gamma = THREE.MathUtils.degToRad(event.gamma); // Y-axis rotation
-
-          const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(beta, gamma, alpha, 'YXZ'));
-          quaternion.multiply(initialQuaternion.current);
-
-          camera.quaternion.copy(quaternion);
+          setDeviceOrientation({
+            alpha: event.alpha,
+            beta: event.beta,
+            gamma: event.gamma
+          });
         }
       };
 
@@ -206,12 +204,25 @@ function CameraController({ isAccelerometerMode, initialRotation }) {
   }, [isAccelerometerMode, camera]);
 
   useFrame(() => {
-    if (!isAccelerometerMode) {
-      setRotation({
-        x: camera.rotation.x,
-        y: camera.rotation.y,
-        z: camera.rotation.z
-      });
+    if (isAccelerometerMode) {
+      const { alpha, beta, gamma } = deviceOrientation;
+      
+      // Преобразование углов в радианы
+      const alphaRad = THREE.MathUtils.degToRad(alpha);
+      const betaRad = THREE.MathUtils.degToRad(beta);
+      const gammaRad = THREE.MathUtils.degToRad(gamma);
+
+      // Создание кватерниона из углов Эйлера
+      const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ'));
+      
+      // Применение начального кватерниона
+      quaternion.multiply(initialQuaternion.current);
+
+      // Плавное интерполирование между текущим и целевым кватернионом
+      targetQuaternion.current.slerp(quaternion, 0.1);
+      
+      // Применение интерполированного кватерниона к камере
+      camera.quaternion.copy(targetQuaternion.current);
     }
   });
 
