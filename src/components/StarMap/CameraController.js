@@ -11,7 +11,7 @@ function CameraController({ isAccelerometerMode, initialRotation }) {
 
   useEffect(() => {
     if (isAccelerometerMode) {
-      // Запрашиваем геолокацию пользователя
+      // Request user's geolocation
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setUserLocation({
@@ -23,37 +23,35 @@ function CameraController({ isAccelerometerMode, initialRotation }) {
         { enableHighAccuracy: true }
       );
 
-      // Обработчик ориентации устройства
+      // Device orientation handler
       const handleOrientation = (event) => {
-        if (event.alpha !== null && event.beta !== null && event.gamma !== null) {
-          setDeviceOrientation({
-            alpha: event.alpha,
-            beta: event.beta,
-            gamma: event.gamma
-          });
-        }
+        setDeviceOrientation({
+          alpha: event.alpha || 0,
+          beta: event.beta || 0,
+          gamma: event.gamma || 0
+        });
       };
 
-      // Запрашиваем разрешение на использование датчиков устройства
+      // Request permission to use device sensors
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
           .then(permissionState => {
             if (permissionState === 'granted') {
-              window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+              window.addEventListener('deviceorientation', handleOrientation, true);
             } else {
               console.error('Permission to access device orientation was denied');
             }
           })
           .catch(console.error);
       } else {
-        window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+        window.addEventListener('deviceorientation', handleOrientation, true);
       }
 
-      // Обновляем время каждую минуту
+      // Update time every minute
       const timeInterval = setInterval(() => setCurrentTime(new Date()), 60000);
 
       return () => {
-        window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
+        window.removeEventListener('deviceorientation', handleOrientation, true);
         clearInterval(timeInterval);
       };
     }
@@ -63,35 +61,35 @@ function CameraController({ isAccelerometerMode, initialRotation }) {
     if (isAccelerometerMode && userLocation) {
       const { alpha, beta, gamma } = deviceOrientation;
       
-      // Преобразование углов в радианы
+      // Convert angles to radians
       const alphaRad = THREE.MathUtils.degToRad(alpha);
       const betaRad = THREE.MathUtils.degToRad(beta);
       const gammaRad = THREE.MathUtils.degToRad(gamma);
 
-      // Вычисляем поправку на географическое положение и время
+      // Calculate correction for geographic location and time
       const siderealTime = calculateSiderealTime(userLocation.longitude, currentTime);
       const latitudeRad = THREE.MathUtils.degToRad(userLocation.latitude);
 
-      // Создаем новую ориентацию камеры
-      const cameraRotation = new THREE.Euler(
-        Math.PI / 2 - betaRad,
-        alphaRad + siderealTime,
-        gammaRad,
-        'YXZ'
-      );
+      // Create new camera orientation
+      const q = new THREE.Quaternion()
+        .setFromEuler(new THREE.Euler(0, alphaRad, 0, 'YXZ'))
+        .multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(betaRad, 0, -gammaRad, 'YXZ')));
 
-      // Применяем поправку на широту
-      cameraRotation.x -= latitudeRad;
+      // Apply latitude correction
+      q.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-latitudeRad, 0, 0, 'YXZ')));
 
-      // Применяем новую ориентацию к камере
-      camera.setRotationFromEuler(cameraRotation);
+      // Apply sidereal time correction
+      q.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -siderealTime, 0, 'YXZ')));
+
+      // Apply the new orientation to the camera
+      camera.setRotationFromQuaternion(q);
     }
   });
 
   return null;
 }
 
-// Функция для вычисления звездного времени
+// Function to calculate sidereal time
 function calculateSiderealTime(longitude, date) {
   const J2000 = new Date('2000-01-01T12:00:00Z');
   const julianDays = (date - J2000) / (1000 * 60 * 60 * 24);
