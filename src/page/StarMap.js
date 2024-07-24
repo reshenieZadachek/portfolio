@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Canvas, useThree, useFrame } from '@react-three/fiber';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 import CameraController from '../components/StarMap/CameraController';
-import DebugOverlay from '../components/DebugOverlay';
 
 
 const toSpherical = (radius, ra, dec) => {
@@ -171,7 +170,7 @@ function StarMap() {
   const [selectedConstellation, setSelectedConstellation] = useState(null);
   const [hoveredConstellation, setHoveredConstellation] = useState(null);
   const [infoVisible, setInfoVisible] = useState(false);
-  const [constellationRadius, setConstellationRadius] = useState(350);
+  const constellationRadius = 350;
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isAccelerometerMode, setIsAccelerometerMode] = useState(false);
   const [deviceOrientation, setDeviceOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
@@ -189,10 +188,6 @@ function StarMap() {
 
   const handleStarHover = useCallback((constellation) => {
     setHoveredConstellation(constellation);
-  }, []);
-
-  const handleRadiusChange = useCallback((event) => {
-    setConstellationRadius(Number(event.target.value));
   }, []);
 
   const toggleFullScreen = useCallback(() => {
@@ -324,11 +319,6 @@ function StarMap() {
           </group>
         ))}
       </Canvas>
-      <DebugOverlay 
-        deviceOrientation={deviceOrientation}
-        userLocation={userLocation}
-        isAccelerometerMode={isAccelerometerMode}
-      />
       <div style={{
         position: 'absolute',
         top: '10px',

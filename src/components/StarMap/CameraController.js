@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -49,16 +49,16 @@ function CameraController({ isAccelerometerMode, deviceOrientation, userLocation
   return null;
 }
 
-// Функция для вычисления звёздного времени (без изменений)
+// Функция для вычисления звёздного времени
 function calculateSiderealTime(longitude, date) {
-    const J2000 = new Date('2000-01-01T12:00:00Z');
-    const julianDays = (date - J2000) / (1000 * 60 * 60 * 24);
-    const centuries = julianDays / 36525;
-    
-    let siderealTime = 280.46061837 + 360.98564736629 * julianDays + 0.000387933 * centuries * centuries - centuries * centuries * centuries / 38710000;
-    siderealTime = siderealTime % 360;
-    
-    return THREE.MathUtils.degToRad(siderealTime + longitude);
+  const J2000 = new Date('2000-01-01T12:00:00Z');
+  const julianDays = (date - J2000) / (1000 * 60 * 60 * 24);
+  const centuries = julianDays / 36525;
+
+  let siderealTime = 280.46061837 + 360.98564736629 * julianDays + 0.000387933 * centuries * centuries - centuries * centuries * centuries / 38710000;
+  siderealTime = siderealTime % 360;
+
+  return THREE.MathUtils.degToRad(siderealTime + longitude);
 }
 
 export default CameraController;
