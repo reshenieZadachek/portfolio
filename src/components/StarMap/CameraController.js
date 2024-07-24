@@ -61,9 +61,9 @@ function CameraController({ isAccelerometerMode, deviceOrientation, userLocation
         const targetRotation = new THREE.Euler().setFromQuaternion(targetQuat);
         
         velocity.current.set(
-          (targetRotation.x - currentRotation.x) * 0.1,
-          (targetRotation.y - currentRotation.y) * 0.1,
-          (targetRotation.z - currentRotation.z) * 0.1
+          (targetRotation.x - currentRotation.x) * 1,
+          (targetRotation.y - currentRotation.y) * 1,
+          (targetRotation.z - currentRotation.z) * 1
         );
 
         camera.rotation.x = velocity.current.x;
