@@ -3,6 +3,7 @@ import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 import CameraController from '../components/StarMap/CameraController';
+import DebugOverlay from '../components/DebugOverlay';
 
 
 const toSpherical = (radius, ra, dec) => {
@@ -173,7 +174,8 @@ function StarMap() {
   const [constellationRadius, setConstellationRadius] = useState(350);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isAccelerometerMode, setIsAccelerometerMode] = useState(false);
-  const [cameraRotation, setCameraRotation] = useState({ x: 0, y: 0, z: 0 });
+  const [deviceOrientation, setDeviceOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
+  const [userLocation, setUserLocation] = useState(null);
   const starMapRef = useRef(null);
   const orbitControlsRef = useRef(null);
   const starSize = 3;
@@ -223,16 +225,54 @@ function StarMap() {
   
 
   const toggleAccelerometerMode = useCallback(() => {
-    if (orbitControlsRef.current) {
-      const camera = orbitControlsRef.current.object;
-      setCameraRotation({
-        x: camera.rotation.x,
-        y: camera.rotation.y,
-        z: camera.rotation.z
-      });
-    }
     setIsAccelerometerMode(prev => !prev);
   }, []);
+
+
+
+  useEffect(() => {
+    if (isAccelerometerMode) {
+      // Запрашиваем геолокацию пользователя
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        },
+        (error) => console.error("Ошибка получения местоположения пользователя:", error),
+        { enableHighAccuracy: true }
+      );
+
+      // Обработчик ориентации устройства
+      const handleOrientation = (event) => {
+        setDeviceOrientation({
+          alpha: event.alpha || 0,
+          beta: event.beta || 0,
+          gamma: event.gamma || 0
+        });
+      };
+
+      // Запрашиваем разрешение на использование датчиков устройства
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission()
+          .then(permissionState => {
+            if (permissionState === 'granted') {
+              window.addEventListener('deviceorientation', handleOrientation, true);
+            } else {
+              console.error('Отказано в доступе к ориентации устройства');
+            }
+          })
+          .catch(console.error);
+      } else {
+        window.addEventListener('deviceorientation', handleOrientation, true);
+      }
+
+      return () => {
+        window.removeEventListener('deviceorientation', handleOrientation, true);
+      };
+    }
+  }, [isAccelerometerMode]);
   return (
     <div ref={starMapRef} style={{ position: 'relative', height: '600px', width: '100%' }}>
       <Canvas style={{ background: 'black' }}>
@@ -245,8 +285,9 @@ function StarMap() {
           />
         )}
         <CameraController 
-          isAccelerometerMode={isAccelerometerMode} 
-          initialRotation={cameraRotation}
+          isAccelerometerMode={isAccelerometerMode}
+          deviceOrientation={deviceOrientation}
+          userLocation={userLocation}
         />
         <ambientLight intensity={0.5} />
         <Stars
@@ -283,6 +324,11 @@ function StarMap() {
           </group>
         ))}
       </Canvas>
+      <DebugOverlay 
+        deviceOrientation={deviceOrientation}
+        userLocation={userLocation}
+        isAccelerometerMode={isAccelerometerMode}
+      />
       <div style={{
         position: 'absolute',
         top: '10px',
