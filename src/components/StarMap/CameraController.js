@@ -4,13 +4,14 @@ import * as THREE from 'three';
 
 function CameraController({ isAccelerometerMode, deviceOrientation, userLocation }) {
   const { camera } = useThree();
-  const targetRotation = useRef(new THREE.Euler());
+  const targetQuaternion = useRef(new THREE.Quaternion());
   const smoothFactor = 0.1; // Фактор сглаживания движений (0-1)
 
   useEffect(() => {
     if (isAccelerometerMode && userLocation) {
       // Устанавливаем начальную ориентацию камеры
       camera.rotation.set(0, 0, 0);
+      camera.quaternion.setFromEuler(camera.rotation);
     }
   }, [isAccelerometerMode, userLocation, camera]);
 
@@ -27,18 +28,22 @@ function CameraController({ isAccelerometerMode, deviceOrientation, userLocation
       const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
       const latitudeRad = THREE.MathUtils.degToRad(userLocation.latitude);
 
-      // Устанавливаем целевую ориентацию камеры
-      targetRotation.current.set(
-        betaRad - Math.PI/2, // Наклон вверх/вниз
-        alphaRad + siderealTime, // Поворот по горизонтали с учетом звездного времени
-        -gammaRad, // Поворот вокруг оси просмотра
-        'YXZ' // Порядок применения вращений
-      );
+      // Создаем кватернион для ориентации устройства
+      const deviceQuaternion = new THREE.Quaternion()
+        .setFromEuler(new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ'));
+
+      // Создаем кватернион для коррекции по географическому положению и времени
+      const correctionQuaternion = new THREE.Quaternion()
+        .setFromEuler(new THREE.Euler(latitudeRad - Math.PI/2, siderealTime, 0, 'YXZ'));
+
+      // Комбинируем кватернионы
+      targetQuaternion.current.multiplyQuaternions(correctionQuaternion, deviceQuaternion);
+
+      // Инвертируем кватернион, чтобы правильно отобразить небо
+      targetQuaternion.current.invert();
 
       // Применяем плавный переход к целевой ориентации
-      camera.rotation.x += (targetRotation.current.y - camera.rotation.y) * smoothFactor;
-      camera.rotation.y += (targetRotation.current.z - camera.rotation.z) * smoothFactor;
-      camera.rotation.z += (targetRotation.current.x - camera.rotation.x) * smoothFactor;
+      camera.quaternion.slerp(targetQuaternion.current, smoothFactor);
     }
   });
 
