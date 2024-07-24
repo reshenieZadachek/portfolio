@@ -9,11 +9,14 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
   const updateInterval = 16; // ~60 fps
 
   useEffect(() => {
-    // Сбрасываем начальную ориентацию при включении/выключении режима акселерометра
     if (isAccelerometerMode && userLocation) {
+      // Сбрасываем начальную ориентацию при включении режима акселерометра
       initialOrientationRef.current = null;
+    } else {
+      // Сбрасываем ротацию сцены при выключении режима акселерометра
+      scene.rotation.set(0, 0, 0);
     }
-  }, [isAccelerometerMode, userLocation]);
+  }, [isAccelerometerMode, userLocation, scene]);
 
   useFrame(() => {
     if (isAccelerometerMode && userLocation) {
@@ -26,7 +29,7 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
         initialOrientationRef.current = new THREE.Euler(
           THREE.MathUtils.degToRad(deviceOrientation.beta),
           THREE.MathUtils.degToRad(deviceOrientation.alpha),
-          THREE.MathUtils.degToRad(-deviceOrientation.gamma),
+          THREE.MathUtils.degToRad(deviceOrientation.gamma),
           'YXZ'
         );
 
@@ -39,7 +42,7 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
       const currentOrientation = new THREE.Euler(
         THREE.MathUtils.degToRad(deviceOrientation.beta),
         THREE.MathUtils.degToRad(deviceOrientation.alpha),
-        THREE.MathUtils.degToRad(-deviceOrientation.gamma),
+        THREE.MathUtils.degToRad(deviceOrientation.gamma),
         'YXZ'
       );
 
@@ -51,17 +54,17 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
         'YXZ'
       );
 
-      // Применяем вращение к сцене
-      scene.rotation.x = -deltaRotation.x;
+      // Применяем вращение к сцене (инвертируем ось Y)
+      scene.rotation.x = deltaRotation.x;
       scene.rotation.y = -deltaRotation.y;
-      scene.rotation.z = -deltaRotation.z;
+      scene.rotation.z = deltaRotation.z;
 
-      // Учитываем географическое положение пользователя
+      // Учитываем географическое положение пользователя и звездное время
       const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
       const latitudeRotation = THREE.MathUtils.degToRad(90 - userLocation.latitude);
       
-      // Применяем дополнительное вращение для учета географического положения
-      scene.rotateOnAxis(new THREE.Vector3(0, 1, 0), siderealTime);
+      // Применяем дополнительное вращение для учета географического положения и звездного времени
+      scene.rotateOnAxis(new THREE.Vector3(0, 1, 0), -siderealTime);
       scene.rotateOnAxis(new THREE.Vector3(1, 0, 0), latitudeRotation);
     }
   });
