@@ -206,33 +206,35 @@ function CameraController({ isAccelerometerMode, initialRotation }) {
   useFrame(() => {
     if (isAccelerometerMode) {
       const { alpha, beta, gamma } = deviceOrientation;
-      
-      // Преобразование углов в радианы
+
+      // Convert alpha, beta, gamma to radians
       const alphaRad = THREE.MathUtils.degToRad(alpha);
       const betaRad = THREE.MathUtils.degToRad(beta);
       const gammaRad = THREE.MathUtils.degToRad(gamma);
 
-      // Создаем отдельные кватернионы для каждого вращения
-      const qX = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, gammaRad, 'XYZ'));
-      const qY = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, alphaRad, 0, 'XYZ'));
-      const qZ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0, 'XYZ'));
+      // Create quaternions for each rotation
+      const qX = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), betaRad);
+      const qY = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), alphaRad);
+      const qZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), gammaRad);
 
-      // Комбинируем вращения в соответствии с вашей схемой
-      const quaternion = new THREE.Quaternion().multiplyQuaternions(qY, qX).multiply(qZ);
-      
-      // Применение начального кватерниона
+      // Combine rotations
+      const quaternion = new THREE.Quaternion();
+      quaternion.multiplyQuaternions(qY, qX).multiply(qZ);
+
+      // Apply initial quaternion
       quaternion.multiply(initialQuaternion.current);
 
-      // Плавное интерполирование между текущим и целевым кватернионом
+      // Smooth interpolation
       targetQuaternion.current.slerp(quaternion, 0.1);
-      
-      // Применение интерполированного кватерниона к камере
+
+      // Apply the interpolated quaternion to the camera
       camera.quaternion.copy(targetQuaternion.current);
     }
   });
 
   return null;
 }
+
 function StarMap() {
   const [selectedConstellation, setSelectedConstellation] = useState(null);
   const [hoveredConstellation, setHoveredConstellation] = useState(null);
