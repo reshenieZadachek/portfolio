@@ -5,44 +5,54 @@ import * as THREE from 'three';
 function CameraController({ isAccelerometerMode, deviceOrientation, userLocation }) {
   const { camera } = useThree();
   const targetQuaternion = useRef(new THREE.Quaternion());
-  const smoothFactor = 0.1; // Фактор сглаживания движений (0-1)
+  const smoothFactor = 0.05; // Уменьшили фактор сглаживания для более плавного движения
+  const previousOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
+  const orientationThreshold = 0.1; // Пороговое значение для фильтрации малых изменений
 
   useEffect(() => {
     if (isAccelerometerMode && userLocation) {
-      // Устанавливаем начальную ориентацию камеры
       camera.rotation.set(0, 0, 0);
       camera.quaternion.setFromEuler(camera.rotation);
     }
   }, [isAccelerometerMode, userLocation, camera]);
 
+  const lowPassFilter = (newValue, oldValue, alpha = 0.2) => {
+    return oldValue + alpha * (newValue - oldValue);
+  };
+
   useFrame(() => {
     if (isAccelerometerMode && userLocation) {
-      const { alpha, beta, gamma } = deviceOrientation;
+      let { alpha, beta, gamma } = deviceOrientation;
       
-      // Преобразуем углы в радианы
+      // Применяем фильтр низких частот и пороговую фильтрацию
+      alpha = Math.abs(alpha - previousOrientation.current.alpha) > orientationThreshold
+        ? lowPassFilter(alpha, previousOrientation.current.alpha)
+        : previousOrientation.current.alpha;
+      beta = Math.abs(beta - previousOrientation.current.beta) > orientationThreshold
+        ? lowPassFilter(beta, previousOrientation.current.beta)
+        : previousOrientation.current.beta;
+      gamma = Math.abs(gamma - previousOrientation.current.gamma) > orientationThreshold
+        ? lowPassFilter(gamma, previousOrientation.current.gamma)
+        : previousOrientation.current.gamma;
+
+      previousOrientation.current = { alpha, beta, gamma };
+
       const alphaRad = THREE.MathUtils.degToRad(alpha);
       const betaRad = THREE.MathUtils.degToRad(beta);
       const gammaRad = THREE.MathUtils.degToRad(gamma);
 
-      // Вычисляем звёздное время
       const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
       const latitudeRad = THREE.MathUtils.degToRad(userLocation.latitude);
 
-      // Создаем кватернион для ориентации устройства
       const deviceQuaternion = new THREE.Quaternion()
         .setFromEuler(new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ'));
 
-      // Создаем кватернион для коррекции по географическому положению и времени
       const correctionQuaternion = new THREE.Quaternion()
         .setFromEuler(new THREE.Euler(latitudeRad - Math.PI/2, siderealTime, 0, 'YXZ'));
 
-      // Комбинируем кватернионы
       targetQuaternion.current.multiplyQuaternions(correctionQuaternion, deviceQuaternion);
-
-      // Инвертируем кватернион, чтобы правильно отобразить небо
       targetQuaternion.current.invert();
 
-      // Применяем плавный переход к целевой ориентации
       camera.quaternion.slerp(targetQuaternion.current, smoothFactor);
     }
   });
@@ -50,7 +60,6 @@ function CameraController({ isAccelerometerMode, deviceOrientation, userLocation
   return null;
 }
 
-// Функция для вычисления звёздного времени
 function calculateSiderealTime(longitude, date) {
   const J2000 = new Date('2000-01-01T12:00:00Z');
   const julianDays = (date - J2000) / (1000 * 60 * 60 * 24);
