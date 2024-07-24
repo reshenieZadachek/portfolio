@@ -168,13 +168,10 @@ const ConstellationLines = React.memo(({ stars, lines, radius, color }) => {
 function CameraController({ isAccelerometerMode, initialRotation }) {
   const { camera } = useThree();
   const [deviceOrientation, setDeviceOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
-  const initialQuaternion = useRef(new THREE.Quaternion());
-  const targetQuaternion = useRef(new THREE.Quaternion());
+  const initialRotationRef = useRef(new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ'));
 
   useEffect(() => {
     if (isAccelerometerMode) {
-      initialQuaternion.current.copy(camera.quaternion);
-
       const handleOrientation = (event) => {
         if (event.alpha !== null && event.beta !== null && event.gamma !== null) {
           setDeviceOrientation({
@@ -201,34 +198,35 @@ function CameraController({ isAccelerometerMode, initialRotation }) {
 
       return () => window.removeEventListener('deviceorientation', handleOrientation, true);
     }
-  }, [isAccelerometerMode, camera]);
+  }, [isAccelerometerMode]);
 
   useFrame(() => {
     if (isAccelerometerMode) {
       const { alpha, beta, gamma } = deviceOrientation;
-
-      // Convert alpha, beta, gamma to radians
+      
+      // Преобразование углов в радианы
       const alphaRad = THREE.MathUtils.degToRad(alpha);
       const betaRad = THREE.MathUtils.degToRad(beta);
       const gammaRad = THREE.MathUtils.degToRad(gamma);
 
-      // Create quaternions for each rotation
-      const qX = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), betaRad);
-      const qY = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), alphaRad);
-      const qZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), gammaRad);
+      // Создаем новый объект Euler для текущей ориентации устройства
+      const deviceEuler = new THREE.Euler(
+        betaRad,
+        alphaRad,
+        -gammaRad,
+        'YXZ'
+      );
 
-      // Combine rotations
-      const quaternion = new THREE.Quaternion();
-      quaternion.multiplyQuaternions(qY, qX).multiply(qZ);
+      // Применяем начальное вращение
+      deviceEuler.x += initialRotationRef.current.x;
+      deviceEuler.y += initialRotationRef.current.y;
+      deviceEuler.z += initialRotationRef.current.z;
 
-      // Apply initial quaternion
-      quaternion.multiply(initialQuaternion.current);
+      // Ограничиваем вращение вокруг оси X (вверх-вниз)
+      deviceEuler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, deviceEuler.x));
 
-      // Smooth interpolation
-      targetQuaternion.current.slerp(quaternion, 0.1);
-
-      // Apply the interpolated quaternion to the camera
-      camera.quaternion.copy(targetQuaternion.current);
+      // Применяем новую ориентацию к камере
+      camera.setRotationFromEuler(deviceEuler);
     }
   });
 
