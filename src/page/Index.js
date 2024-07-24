@@ -62,7 +62,7 @@ const Main = () => {
         date: '2024-07-10',
       },
         { id: 6, name: 'Карта звездного неба', description: 'Интерактивная карта звездного неба', technologies: 'HTML, CSS, JavaScript, React, Styled-components', 
-        img: '',
+        img: 'starmapbanner.png',
         link: STARMAP_ROUTE,
         date: '2024-07-22',
       },
