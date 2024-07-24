@@ -217,7 +217,7 @@ function CameraController({ isAccelerometerMode, initialRotation }) {
       const qY = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, alphaRad, 0, 'XYZ'));
       const qZ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -gammaRad, 'XYZ'));
 
-      // Комбинируем вращения
+      // Комбинируем вращения в соответствии с вашей схемой
       const quaternion = new THREE.Quaternion().multiplyQuaternions(qY, qX).multiply(qZ);
       
       // Применение начального кватерниона
