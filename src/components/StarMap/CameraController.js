@@ -26,38 +26,38 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
         initialOrientation.current = { ...deviceOrientation };
       }
 
-      // Вычисляем относительные углы
+      // Calculate relative angles
       const alpha = (deviceOrientation.alpha - initialOrientation.current.alpha + 360) % 360;
       const beta = deviceOrientation.beta - initialOrientation.current.beta;
       const gamma = deviceOrientation.gamma - initialOrientation.current.gamma;
 
-      // Сглаживание ориентации
+      // Smooth orientation
       smoothedOrientation.current.alpha = THREE.MathUtils.lerp(smoothedOrientation.current.alpha, alpha, smoothFactor);
       smoothedOrientation.current.beta = THREE.MathUtils.lerp(smoothedOrientation.current.beta, beta, smoothFactor);
       smoothedOrientation.current.gamma = THREE.MathUtils.lerp(smoothedOrientation.current.gamma, gamma, smoothFactor);
 
-      // Преобразование углов в радианы
+      // Convert angles to radians
       const alphaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.alpha);
       const betaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.beta);
       const gammaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.gamma);
 
-      // Создание матрицы вращения
+      // Create rotation matrix
       const rotationMatrix = new THREE.Matrix4().makeRotationFromEuler(
         new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ')
       );
 
-      // Применение вращения к камере
+      // Apply rotation to camera
       camera.quaternion.setFromRotationMatrix(rotationMatrix);
 
-      // Учет географического положения пользователя
+      // Consider user geographic position
       const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
       const latitudeRotation = THREE.MathUtils.degToRad(90 - userLocation.latitude);
 
-      // Применяем вращение для учета географического положения
+      // Apply rotation to consider geographic position
       camera.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), -siderealTime);
       camera.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), -latitudeRotation);
 
-      // Фиксируем ось вращения, чтобы избежать нежелательного вращения
+      // Fix rotation axis to avoid unwanted rotation
       const up = new THREE.Vector3(0, 1, 0);
       camera.up.copy(up);
     }
