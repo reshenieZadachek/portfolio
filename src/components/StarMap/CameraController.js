@@ -3,18 +3,51 @@ import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 function StarMapController({ isAccelerometerMode, deviceOrientation, userLocation }) {
-  const { camera } = useThree();
+  const { camera, scene } = useThree();
   const lastUpdateTime = useRef(Date.now());
   const updateInterval = 16; // ~60 fps
   const smoothFactor = 0.1;
   const smoothedOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
   const initialOrientation = useRef(null);
+  const starsGroup = useRef(null);
 
   useEffect(() => {
-    if (isAccelerometerMode) {
+    if (isAccelerometerMode && userLocation) {
+      // Create a new group for stars if it doesn't exist
+      if (!starsGroup.current) {
+        starsGroup.current = new THREE.Group();
+        scene.add(starsGroup.current);
+      }
+
+      // Position the camera at the center of the sphere
+      camera.position.set(0, 0, 0);
+
+      // Align the star sphere based on user's location
+      const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
+      const latitudeRotation = THREE.MathUtils.degToRad(90 - userLocation.latitude);
+
+      starsGroup.current.rotation.y = -siderealTime;
+      starsGroup.current.rotation.x = -latitudeRotation;
+
+      // Move all stars and constellations to the starsGroup
+      scene.children.forEach(child => {
+        if (child.type === 'Group' && child !== starsGroup.current) {
+          starsGroup.current.add(child);
+        }
+      });
+
       initialOrientation.current = null;
+    } else {
+      // If accelerometer mode is off, reset the scene
+      if (starsGroup.current) {
+        scene.remove(starsGroup.current);
+        starsGroup.current.children.forEach(child => {
+          scene.add(child);
+        });
+        starsGroup.current = null;
+      }
     }
-  }, [isAccelerometerMode]);
+  }, [isAccelerometerMode, userLocation, scene, camera]);
 
   useFrame(() => {
     if (isAccelerometerMode && userLocation) {
@@ -48,14 +81,6 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
 
       // Apply rotation to camera
       camera.quaternion.setFromRotationMatrix(rotationMatrix);
-
-      // Consider user geographic position
-      const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
-      const latitudeRotation = THREE.MathUtils.degToRad(90 - userLocation.latitude);
-
-      // Apply rotation to consider geographic position
-      camera.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), -siderealTime);
-      camera.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), -latitudeRotation);
 
       // Fix rotation axis to avoid unwanted rotation
       const up = new THREE.Vector3(0, 1, 0);

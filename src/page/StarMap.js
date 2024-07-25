@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Stars } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 import StarMapController from '../components/StarMap/CameraController';
 
@@ -254,6 +254,7 @@ function StarMap() {
   return (
     <div ref={starMapRef} style={{ position: 'relative', height: '600px', width: '100%' }}>
       <Canvas style={{ background: 'black' }}>
+      <PerspectiveCamera makeDefault position={[0, 0, 0]} />
       {!isAccelerometerMode && (
           <OrbitControls 
             enableRotate={true}
