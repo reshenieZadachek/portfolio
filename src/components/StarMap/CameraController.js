@@ -8,14 +8,13 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
     const compassHeading = useRef(0);
     const lastUpdateTime = useRef(Date.now());
     const updateInterval = 16; // ~60 fps
-    const smoothFactor = 0.1;
+    const smoothFactor = 0.2; // Increase smooth factor for smoother transitions
     const [isCalibrated, setIsCalibrated] = useState(false);
     const [isCalibrating, setIsCalibrating] = useState(false);
     const [calibrationOffset, setCalibrationOffset] = useState({ x: 0, y: 0, z: 0 });
     const lastCalibrationTime = useRef(Date.now());
     const calibrationInterval = 5 * 60 * 1000; // 5 минут
-    const baseOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
-    const filteredOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
+    const smoothedOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
 
     useEffect(() => {
         if (isAccelerometerMode && userLocation) {
@@ -53,11 +52,10 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
             compassHeading.current = 360 - event.alpha;
         }
 
-        // Filtering with Kalman Filter or simple smoothing
-        const smoothFactor = 0.1;
-        filteredOrientation.current.alpha = filteredOrientation.current.alpha * (1 - smoothFactor) + event.alpha * smoothFactor;
-        filteredOrientation.current.beta = filteredOrientation.current.beta * (1 - smoothFactor) + event.beta * smoothFactor;
-        filteredOrientation.current.gamma = filteredOrientation.current.gamma * (1 - smoothFactor) + event.gamma * smoothFactor;
+        // Smooth orientation data
+        smoothedOrientation.current.alpha = smoothedOrientation.current.alpha * (1 - smoothFactor) + event.alpha * smoothFactor;
+        smoothedOrientation.current.beta = smoothedOrientation.current.beta * (1 - smoothFactor) + event.beta * smoothFactor;
+        smoothedOrientation.current.gamma = smoothedOrientation.current.gamma * (1 - smoothFactor) + event.gamma * smoothFactor;
     };
 
     useFrame(() => {
@@ -70,7 +68,7 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
                 calibrateOrientation();
             }
 
-            const { alpha, beta, gamma } = filteredOrientation.current;
+            const { alpha, beta, gamma } = smoothedOrientation.current;
             
             const q = new THREE.Quaternion().setFromEuler(
                 new THREE.Euler(
@@ -100,21 +98,21 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
 
     const calibrateOrientation = () => {
         setIsCalibrating(true);
-
+        
         // Используем текущие показания датчиков как базовые
-        baseOrientation.current = {
-            x: filteredOrientation.current.beta,
-            y: filteredOrientation.current.alpha,
-            z: filteredOrientation.current.gamma
+        const baseOrientation = {
+            x: smoothedOrientation.current.beta,
+            y: smoothedOrientation.current.alpha,
+            z: smoothedOrientation.current.gamma
         };
 
         // Вычисляем отклонение от идеального положения
         const idealOrientation = calculateIdealOrientation(userLocation);
         
         setCalibrationOffset({
-            x: idealOrientation.x - baseOrientation.current.x,
-            y: idealOrientation.y - baseOrientation.current.y,
-            z: idealOrientation.z - baseOrientation.current.z
+            x: idealOrientation.x - baseOrientation.x,
+            y: idealOrientation.y - baseOrientation.y,
+            z: idealOrientation.z - baseOrientation.z
         });
 
         setIsCalibrated(true);
