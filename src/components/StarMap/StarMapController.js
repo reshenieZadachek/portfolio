@@ -12,6 +12,7 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
   const starsGroup = useRef(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const lastAlpha = useRef(0);
+  const rotationAxis = useRef(new THREE.Vector3(0, 1, 0));
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -37,6 +38,12 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
 
       initialOrientation.current = null;
       lastAlpha.current = 0;
+      
+      // Set initial camera position based on user location
+      const latitude = THREE.MathUtils.degToRad(90 - userLocation.latitude);
+      const longitude = THREE.MathUtils.degToRad(userLocation.longitude);
+      camera.position.setFromSpherical(new THREE.Spherical(1, latitude, longitude));
+      camera.lookAt(new THREE.Vector3(0, 0, 0));
     } else {
       if (starsGroup.current) {
         // Move all children back to the scene
@@ -46,8 +53,9 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
         scene.remove(starsGroup.current);
         starsGroup.current = null;
       }
-      // Reset camera rotation
-      camera.rotation.set(0, 0, 0);
+      // Reset camera position and rotation
+      camera.position.set(0, 0, 5);
+      camera.lookAt(new THREE.Vector3(0, 0, 0));
     }
   }, [isAccelerometerMode, userLocation, scene, camera]);
 
@@ -86,25 +94,22 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
       const betaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.beta);
       const gammaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.gamma);
 
-      // Create rotation matrix
-      const rotationMatrix = new THREE.Matrix4().makeRotationFromEuler(
-        new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ')
+      // Update rotation axis based on device orientation
+      rotationAxis.current.set(
+        Math.sin(gammaRad) * Math.cos(alphaRad) - Math.sin(betaRad) * Math.cos(gammaRad) * Math.sin(alphaRad),
+        Math.sin(betaRad) * Math.sin(alphaRad) + Math.sin(gammaRad) * Math.cos(betaRad) * Math.cos(alphaRad),
+        Math.cos(betaRad) * Math.cos(gammaRad)
       );
 
-      // Apply rotation to camera
-      camera.quaternion.setFromRotationMatrix(rotationMatrix);
-
-      // Fix rotation axis to avoid unwanted rotation
-      const up = new THREE.Vector3(0, 1, 0);
-      camera.up.copy(up);
+      // Rotate camera around the calculated axis
+      const rotationAngle = Math.sqrt(alphaRad * alphaRad + betaRad * betaRad + gammaRad * gammaRad);
+      camera.position.applyAxisAngle(rotationAxis.current, rotationAngle);
+      camera.lookAt(new THREE.Vector3(0, 0, 0));
 
       // Update star positions based on current time and location
       if (starsGroup.current) {
         const siderealTime = calculateSiderealTime(userLocation.longitude, currentTime);
-        const latitudeRotation = THREE.MathUtils.degToRad(90 - userLocation.latitude);
-
         starsGroup.current.rotation.y = -siderealTime;
-        starsGroup.current.rotation.x = -latitudeRotation;
       }
     }
   });

@@ -106,6 +106,8 @@ function StarMap() {
           enableRotate={!isAccelerometerMode}
           enablePan={!isAccelerometerMode}
           enableZoom={!isAccelerometerMode}
+          minPolarAngle={0}
+          maxPolarAngle={Math.PI}
         />
         <StarMapController 
           isAccelerometerMode={isAccelerometerMode}
@@ -113,9 +115,9 @@ function StarMap() {
           userLocation={userLocation}
         />
         <Stars
-          radius={130}
-          depth={60}
-          count={10000}
+          radius={100}
+          depth={50}
+          count={5000}
           factor={4}
           saturation={0}
           fade
