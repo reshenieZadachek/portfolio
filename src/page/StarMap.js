@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Stars } from '@react-three/drei';
 import * as THREE from 'three';
-import StarMapController from '../components/StarMap/CameraController';
+//import StarMapController from '../components/StarMap/CameraController';
 
 const toSpherical = (radius, ra, dec) => {
   const theta = (ra * Math.PI) / 12;
@@ -127,7 +127,99 @@ const constellations = [
     lines: [[0, 1], [1, 2], [2, 3], [3, 0]],
   },
 ];
+function StarMapController({ isAccelerometerMode, deviceOrientation, userLocation }) {
+  const { camera, scene } = useThree();
+  const orbitControlsRef = useRef();
+  const lastUpdateTime = useRef(Date.now());
+  const updateInterval = 16; // ~60 fps
+  const smoothFactor = 0.1;
+  const smoothedOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
+  const initialOrientation = useRef(null);
+  const starsGroup = useRef(null);
 
+  useEffect(() => {
+    if (isAccelerometerMode && userLocation) {
+      if (!starsGroup.current) {
+        starsGroup.current = new THREE.Group();
+        scene.add(starsGroup.current);
+      }
+      camera.position.set(0, 0, 0);
+      const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
+      const latitudeRotation = THREE.MathUtils.degToRad(90 - userLocation.latitude);
+      starsGroup.current.rotation.y = -siderealTime;
+      starsGroup.current.rotation.x = -latitudeRotation;
+      scene.children.forEach(child => {
+        if (child.type === 'Group' && child !== starsGroup.current) {
+          starsGroup.current.add(child);
+        }
+      });
+      initialOrientation.current = null;
+    } else {
+      if (starsGroup.current) {
+        scene.remove(starsGroup.current);
+        starsGroup.current.children.forEach(child => {
+          scene.add(child);
+        });
+        starsGroup.current = null;
+      }
+    }
+  }, [isAccelerometerMode, userLocation, scene, camera]);
+
+  useFrame(() => {
+    if (isAccelerometerMode && userLocation) {
+      const currentTime = Date.now();
+      if (currentTime - lastUpdateTime.current < updateInterval) return;
+      lastUpdateTime.current = currentTime;
+
+      if (!initialOrientation.current) {
+        initialOrientation.current = { ...deviceOrientation };
+      }
+
+      const alpha = (deviceOrientation.alpha - initialOrientation.current.alpha + 360) % 360;
+      const beta = deviceOrientation.beta - initialOrientation.current.beta;
+      const gamma = deviceOrientation.gamma - initialOrientation.current.gamma;
+
+      smoothedOrientation.current.alpha = THREE.MathUtils.lerp(smoothedOrientation.current.alpha, alpha, smoothFactor);
+      smoothedOrientation.current.beta = THREE.MathUtils.lerp(smoothedOrientation.current.beta, beta, smoothFactor);
+      smoothedOrientation.current.gamma = THREE.MathUtils.lerp(smoothedOrientation.current.gamma, gamma, smoothFactor);
+
+      const alphaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.alpha);
+      const betaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.beta);
+      const gammaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.gamma);
+
+      const rotationMatrix = new THREE.Matrix4().makeRotationFromEuler(
+        new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ')
+      );
+
+      camera.quaternion.setFromRotationMatrix(rotationMatrix);
+
+      const up = new THREE.Vector3(0, 1, 0);
+      camera.up.copy(up);
+    }
+  });
+
+  return (
+    <OrbitControls
+      ref={orbitControlsRef}
+      enableRotate={!isAccelerometerMode}
+      enablePan={false}
+      enableZoom={true}
+      minDistance={10}
+      maxDistance={1000}
+    />
+  );
+}
+
+function calculateSiderealTime(longitude, date) {
+  const J2000 = new Date('2000-01-01T12:00:00Z');
+  const julianDays = (date - J2000) / (1000 * 60 * 60 * 24);
+  const centuries = julianDays / 36525;
+  let siderealTime = 280.46061837 + 360.98564736629 * julianDays +
+                     0.000387933 * centuries * centuries -
+                     centuries * centuries * centuries / 38710000;
+  siderealTime = siderealTime % 360;
+  return THREE.MathUtils.degToRad(siderealTime + longitude);
+}
 const Star = React.memo(({ position, size, color, hovered, onClick, onPointerOver, onPointerOut }) => {
   return (
     <mesh
@@ -255,13 +347,6 @@ function StarMap() {
     <div ref={starMapRef} style={{ position: 'relative', height: '600px', width: '100%' }}>
       <Canvas style={{ background: 'black' }}>
       <PerspectiveCamera makeDefault position={[0, 0, 0]} />
-      {!isAccelerometerMode && (
-          <OrbitControls 
-            enableRotate={true}
-            enablePan={true}
-            enableZoom={true}
-          />
-        )}
         <StarMapController 
           isAccelerometerMode={isAccelerometerMode}
           deviceOrientation={deviceOrientation}
@@ -330,19 +415,19 @@ function StarMap() {
           {isFullScreen ? 'Свернуть' : 'На весь экран'}
         </button>
         <button
-          onClick={toggleAccelerometerMode}
+          onClick={() => setIsAccelerometerMode(!isAccelerometerMode)}
           style={{
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
             color: 'white',
-            border: 'none',
+            border: '1px solid white',
             padding: '10px 15px',
-            borderRadius: '5px',
+            borderRadius: '20px',
             cursor: 'pointer',
             fontSize: '14px',
             fontWeight: 'bold'
           }}
         >
-          {isAccelerometerMode ? 'Выключить акселерометр' : 'Включить акселерометр'}
+          {isAccelerometerMode ? 'Свернуть' : 'Запустить вращение карты звездного неба'}
         </button>
       </div>
 
