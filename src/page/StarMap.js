@@ -130,71 +130,49 @@ const constellations = [
 function StarMapController({ isAccelerometerMode, deviceOrientation, userLocation }) {
   const { camera, scene } = useThree();
   const orbitControlsRef = useRef();
+  const deviceRef = useRef(new THREE.Group());
+  const starsGroupRef = useRef(new THREE.Group());
   const lastUpdateTime = useRef(Date.now());
   const updateInterval = 16; // ~60 fps
   const smoothFactor = 0.1;
-  const smoothedOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
-  const initialOrientation = useRef(null);
-  const starsGroup = useRef(null);
+
+  useEffect(() => {
+    scene.add(deviceRef.current);
+    deviceRef.current.add(camera);
+    scene.add(starsGroupRef.current);
+
+    return () => {
+      scene.remove(deviceRef.current);
+      scene.remove(starsGroupRef.current);
+    };
+  }, [scene]);
 
   useEffect(() => {
     if (isAccelerometerMode && userLocation) {
-      if (!starsGroup.current) {
-        starsGroup.current = new THREE.Group();
-        scene.add(starsGroup.current);
-      }
-      camera.position.set(0, 0, 0);
+      // Выравнивание звездного неба относительно реального положения
       const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
       const latitudeRotation = THREE.MathUtils.degToRad(90 - userLocation.latitude);
-      starsGroup.current.rotation.y = -siderealTime;
-      starsGroup.current.rotation.x = -latitudeRotation;
-      scene.children.forEach(child => {
-        if (child.type === 'Group' && child !== starsGroup.current) {
-          starsGroup.current.add(child);
-        }
-      });
-      initialOrientation.current = null;
-    } else {
-      if (starsGroup.current) {
-        scene.remove(starsGroup.current);
-        starsGroup.current.children.forEach(child => {
-          scene.add(child);
-        });
-        starsGroup.current = null;
-      }
+      starsGroupRef.current.rotation.y = -siderealTime;
+      starsGroupRef.current.rotation.x = -latitudeRotation;
     }
-  }, [isAccelerometerMode, userLocation, scene, camera]);
+  }, [isAccelerometerMode, userLocation]);
 
   useFrame(() => {
-    if (isAccelerometerMode && userLocation) {
+    if (isAccelerometerMode) {
       const currentTime = Date.now();
       if (currentTime - lastUpdateTime.current < updateInterval) return;
       lastUpdateTime.current = currentTime;
 
-      if (!initialOrientation.current) {
-        initialOrientation.current = { ...deviceOrientation };
-      }
+      // Применение ориентации устройства к группе устройства
+      const { alpha, beta, gamma } = deviceOrientation;
+      const alphaRad = THREE.MathUtils.degToRad(alpha);
+      const betaRad = THREE.MathUtils.degToRad(beta);
+      const gammaRad = THREE.MathUtils.degToRad(gamma);
 
-      const alpha = (deviceOrientation.alpha - initialOrientation.current.alpha + 360) % 360;
-      const beta = deviceOrientation.beta - initialOrientation.current.beta;
-      const gamma = deviceOrientation.gamma - initialOrientation.current.gamma;
-
-      smoothedOrientation.current.alpha = THREE.MathUtils.lerp(smoothedOrientation.current.alpha, alpha, smoothFactor);
-      smoothedOrientation.current.beta = THREE.MathUtils.lerp(smoothedOrientation.current.beta, beta, smoothFactor);
-      smoothedOrientation.current.gamma = THREE.MathUtils.lerp(smoothedOrientation.current.gamma, gamma, smoothFactor);
-
-      const alphaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.alpha);
-      const betaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.beta);
-      const gammaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.gamma);
-
-      const rotationMatrix = new THREE.Matrix4().makeRotationFromEuler(
-        new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ')
-      );
-
-      camera.quaternion.setFromRotationMatrix(rotationMatrix);
-
-      const up = new THREE.Vector3(0, 1, 0);
-      camera.up.copy(up);
+      const quaternion = new THREE.Quaternion()
+        .setFromEuler(new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ'));
+      
+      deviceRef.current.quaternion.slerp(quaternion, smoothFactor);
     }
   });
 
@@ -220,6 +198,7 @@ function calculateSiderealTime(longitude, date) {
   siderealTime = siderealTime % 360;
   return THREE.MathUtils.degToRad(siderealTime + longitude);
 }
+
 const Star = React.memo(({ position, size, color, hovered, onClick, onPointerOver, onPointerOut }) => {
   return (
     <mesh
@@ -402,8 +381,10 @@ function StarMap() {
         position: 'absolute',
         top: '10px',
         left: '10px',
+        right: '10px',
         display: 'flex',
         flexDirection: 'column',
+        alignItems: 'stretch',
         gap: '10px'
       }}>
         <button
@@ -411,12 +392,13 @@ function StarMap() {
           style={{
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
             color: 'white',
-            border: 'none',
-            padding: '10px 15px',
-            borderRadius: '5px',
+            border: '1px solid rgba(255, 255, 255, 0.5)',
+            padding: '15px',
+            borderRadius: '30px',
             cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'bold'
+            fontSize: '16px',
+            fontWeight: 'normal',
+            textAlign: 'left'
           }}
         >
           {isFullScreen ? 'Свернуть' : 'На весь экран'}
@@ -426,12 +408,13 @@ function StarMap() {
           style={{
             backgroundColor: 'rgba(0, 0, 0, 0.5)',
             color: 'white',
-            border: '1px solid white',
-            padding: '10px 15px',
-            borderRadius: '20px',
+            border: '1px solid rgba(255, 255, 255, 0.5)',
+            padding: '15px',
+            borderRadius: '30px',
             cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'bold'
+            fontSize: '16px',
+            fontWeight: 'normal',
+            textAlign: 'left'
           }}
         >
           {isAccelerometerMode ? 'Свернуть' : 'Запустить вращение карты звездного неба'}
