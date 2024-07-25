@@ -168,23 +168,16 @@ function StarMap() {
   const [selectedConstellation, setSelectedConstellation] = useState(null);
   const [hoveredConstellation, setHoveredConstellation] = useState(null);
   const [infoVisible, setInfoVisible] = useState(false);
-  const constellationRadius = 350;
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isAccelerometerMode, setIsAccelerometerMode] = useState(false);
   const [deviceOrientation, setDeviceOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
   const [userLocation, setUserLocation] = useState(null);
-  const [isCalibrating, setIsCalibrating] = useState(false);
   const starMapRef = useRef(null);
-  const orbitControlsRef = useRef(null);
-  const [manualAdjustment, setManualAdjustment] = useState({ x: 0, y: 0, z: 0 });
-  const [sensitivity, setSensitivity] = useState(1);
-  const [cameraRotation, setCameraRotation] = useState(new THREE.Euler());
+  const constellationRadius = 350;
   const starSize = 3;
   const starColor = '#FFFFFF';
-  const lineColor = '#4169E1'; 
-  const handleCameraRotation = useCallback((rotation) => {
-    setCameraRotation(rotation);
-  }, []);
+  const lineColor = '#4169E1';
+
   const handleConstellationClick = useCallback((constellation) => {
     setSelectedConstellation(constellation);
     setInfoVisible(true);
@@ -204,6 +197,10 @@ function StarMap() {
     }
   }, []);
 
+  const toggleAccelerometerMode = useCallback(() => {
+    setIsAccelerometerMode(prev => !prev);
+  }, []);
+
   useEffect(() => {
     const handleFullScreenChange = () => {
       setIsFullScreen(!!document.fullscreenElement);
@@ -214,21 +211,7 @@ function StarMap() {
   }, []);
 
   useEffect(() => {
-    if (infoVisible) {
-      const timer = setTimeout(() => {
-        setInfoVisible(false);
-      }, 10000);
-      return () => clearTimeout(timer);
-    }
-  }, [infoVisible]);
-
-  const toggleAccelerometerMode = useCallback(() => {
-    setIsAccelerometerMode(prev => !prev);
-  }, []);
-
-  useEffect(() => {
     if (isAccelerometerMode) {
-      // Запрашиваем геолокацию пользователя
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setUserLocation({
@@ -240,7 +223,14 @@ function StarMap() {
         { enableHighAccuracy: true }
       );
 
-      // Запрашиваем разрешение на использование датчиков устройства
+      const handleOrientation = (event) => {
+        setDeviceOrientation({
+          alpha: event.alpha || 0,
+          beta: event.beta || 0,
+          gamma: event.gamma || 0
+        });
+      };
+
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
           .then(permissionState => {
@@ -260,70 +250,32 @@ function StarMap() {
       };
     }
   }, [isAccelerometerMode]);
-  const handleOrientation = useCallback((event) => {
-    setDeviceOrientation({
-      alpha: event.alpha || 0,
-      beta: event.beta || 0,
-      gamma: event.gamma || 0
-    });
-  }, []);
-  const handleManualAdjustment = useCallback((axis, value) => {
-    setManualAdjustment(prev => ({
-      ...prev,
-      [axis]: prev[axis] + value * sensitivity
-    }));
-  }, [sensitivity]);
-  const handleSensitivityChange = useCallback((event) => {
-    setSensitivity(parseFloat(event.target.value));
-  }, []);
-
-  const calibrateOrientation = useCallback(() => {
-    setIsCalibrating(true);
-    // Здесь должна быть логика калибровки
-    setTimeout(() => {
-      setIsCalibrating(false);
-    }, 3000); // Имитация процесса калибровки в течение 3 секунд
-  }, []);
-
-  const buttonStyle = {
-    padding: '10px 20px',
-    fontSize: '16px',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    color: 'white',
-    border: '1px solid white',
-    borderRadius: '5px',
-    cursor: 'pointer'
-  };
 
   return (
     <div ref={starMapRef} style={{ position: 'relative', height: '600px', width: '100%' }}>
       <Canvas style={{ background: 'black' }}>
-        <OrbitControls 
-          ref={orbitControlsRef}
-          enableRotate={!isAccelerometerMode}
-          enablePan={!isAccelerometerMode}
-          enableZoom={!isAccelerometerMode}
-          onChange={(e) => {
-            if (!isAccelerometerMode) {
-              handleCameraRotation(e.target.object.rotation);
-            }
-          }}
-        />
+        {!isAccelerometerMode && (
+          <OrbitControls 
+            enableRotate={true}
+            enablePan={true}
+            enableZoom={true}
+          />
+        )}
         <StarMapController 
           isAccelerometerMode={isAccelerometerMode}
           deviceOrientation={deviceOrientation}
           userLocation={userLocation}
         />
-        <group rotation={cameraRotation}>
+        <Stars
+          radius={130}
+          depth={60}
+          count={10000}
+          factor={4}
+          saturation={0}
+          fade
+        />
+        <group>
           <ambientLight intensity={0.5} />
-          <Stars
-            radius={130}
-            depth={60}
-            count={10000}
-            factor={4}
-            saturation={0}
-            fade
-          />
           {constellations.map((constellation, idx) => (
             <group key={idx}>
               {constellation.stars.map((star, starIdx) => {
@@ -352,6 +304,7 @@ function StarMap() {
         </group>
       </Canvas>
       
+      {/* UI элементы остаются без изменений */}
       <div style={{
         position: 'absolute',
         top: '10px',
@@ -359,55 +312,15 @@ function StarMap() {
         color: 'white',
         background: 'rgba(0, 0, 0, 0.7)',
         padding: '10px',
-        borderRadius: '5px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        gap: '10px'
+        borderRadius: '5px'
       }}>
-        <button onClick={toggleFullScreen} style={buttonStyle}>
+        <button onClick={toggleFullScreen}>
           {isFullScreen ? 'Свернуть' : 'На весь экран'}
         </button>
-        <button onClick={toggleAccelerometerMode} style={buttonStyle}>
+        <button onClick={toggleAccelerometerMode}>
           {isAccelerometerMode ? 'Выключить акселерометр' : 'Включить акселерометр'}
         </button>
-        <p style={{ margin: 0, fontSize: '12px' }}>
-          {isAccelerometerMode 
-            ? 'Двигайте устройство, чтобы осмотреться' 
-            : 'Зажмите для вращения карты звездного неба'}
-        </p>
-        <p style={{ margin: 0, fontSize: '12px' }}>Нажмите на звезду созвездия, чтобы увидеть информацию о нем</p>
       </div>
-
-      {isAccelerometerMode && (
-        <div style={{
-          position: 'absolute',
-          bottom: '20px',
-          right: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px',
-          zIndex: 1000
-        }}>
-          <button onClick={calibrateOrientation} style={buttonStyle}>Перекалибровать</button>
-        </div>
-      )}
-
-      {isCalibrating && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          background: 'rgba(0, 0, 0, 0.7)',
-          color: 'white',
-          padding: '20px',
-          borderRadius: '10px',
-          zIndex: 1000
-        }}>
-          Калибровка...
-        </div>
-      )}
 
       {selectedConstellation && infoVisible && (
         <div style={{

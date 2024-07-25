@@ -1,181 +1,77 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
-import { Html, Text } from '@react-three/drei';
 import * as THREE from 'three';
 
 function StarMapController({ isAccelerometerMode, deviceOrientation, userLocation }) {
-    const { camera } = useThree();
-    const lastUpdateTime = useRef(Date.now());
-    const updateInterval = 16; // ~60 fps
-    const smoothFactor = 0.05; // Уменьшено для более плавного движения
-    const [isCalibrated, setIsCalibrated] = useState(false);
-    const [isCalibrating, setIsCalibrating] = useState(false);
-    const lastCalibrationTime = useRef(Date.now());
-    const calibrationInterval = 5 * 60 * 1000; // 5 минут
-    const smoothedOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
-    const initialOrientation = useRef(null);
-    const compassHeading = useRef(0);
+  const { camera } = useThree();
+  const lastUpdateTime = useRef(Date.now());
+  const updateInterval = 16; // ~60 fps
+  const smoothFactor = 0.1;
+  const smoothedOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
+  const initialOrientation = useRef(null);
 
-    useEffect(() => {
-        if (isAccelerometerMode && userLocation) {
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission()
-                    .then(permissionState => {
-                        if (permissionState === 'granted') {
-                            window.addEventListener('deviceorientation', handleOrientation, true);
-                            window.addEventListener('deviceorientationabsolute', handleAbsoluteOrientation, true);
-                        } else {
-                            console.error('Отказано в доступе к ориентации устройства');
-                        }
-                    })
-                    .catch(console.error);
-            } else {
-                window.addEventListener('deviceorientation', handleOrientation, true);
-                window.addEventListener('deviceorientationabsolute', handleAbsoluteOrientation, true);
-            }
+  useEffect(() => {
+    if (isAccelerometerMode) {
+      initialOrientation.current = null;
+    }
+  }, [isAccelerometerMode]);
 
-            return () => {
-                window.removeEventListener('deviceorientation', handleOrientation, true);
-                window.removeEventListener('deviceorientationabsolute', handleAbsoluteOrientation, true);
-            };
-        } else {
-            // Сброс ориентации при выключении акселерометра
-            initialOrientation.current = null;
-            smoothedOrientation.current = { alpha: 0, beta: 0, gamma: 0 };
-        }
-    }, [isAccelerometerMode, userLocation]);
+  useFrame(() => {
+    if (isAccelerometerMode && userLocation) {
+      const currentTime = Date.now();
+      if (currentTime - lastUpdateTime.current < updateInterval) return;
+      lastUpdateTime.current = currentTime;
 
-    const handleOrientation = (event) => {
-        if (!initialOrientation.current) {
-            initialOrientation.current = {
-                alpha: event.alpha || 0,
-                beta: event.beta || 0,
-                gamma: event.gamma || 0
-            };
-        }
+      if (!initialOrientation.current) {
+        initialOrientation.current = { ...deviceOrientation };
+      }
 
-        // Вычисляем относительные углы
-        let alpha = (event.alpha || 0) - initialOrientation.current.alpha;
-        let beta = (event.beta || 0) - initialOrientation.current.beta;
-        let gamma = (event.gamma || 0) - initialOrientation.current.gamma;
+      // Вычисляем относительные углы
+      const alpha = (deviceOrientation.alpha - initialOrientation.current.alpha + 360) % 360;
+      const beta = deviceOrientation.beta - initialOrientation.current.beta;
+      const gamma = deviceOrientation.gamma - initialOrientation.current.gamma;
 
-        // Нормализуем углы
-        alpha = (alpha + 360) % 360;
-        beta = Math.max(-90, Math.min(90, beta));
-        gamma = Math.max(-90, Math.min(90, gamma));
+      // Сглаживание ориентации
+      smoothedOrientation.current.alpha = THREE.MathUtils.lerp(smoothedOrientation.current.alpha, alpha, smoothFactor);
+      smoothedOrientation.current.beta = THREE.MathUtils.lerp(smoothedOrientation.current.beta, beta, smoothFactor);
+      smoothedOrientation.current.gamma = THREE.MathUtils.lerp(smoothedOrientation.current.gamma, gamma, smoothFactor);
 
-        // Преобразуем углы в радианы
-        const alphaRad = THREE.MathUtils.degToRad(alpha);
-        const betaRad = THREE.MathUtils.degToRad(beta);
-        const gammaRad = THREE.MathUtils.degToRad(gamma);
+      // Преобразование углов в радианы
+      const alphaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.alpha);
+      const betaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.beta);
+      const gammaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.gamma);
 
-        // Применяем сглаживание
-        smoothedOrientation.current.alpha = THREE.MathUtils.lerp(smoothedOrientation.current.alpha, alphaRad, smoothFactor);
-        smoothedOrientation.current.beta = THREE.MathUtils.lerp(smoothedOrientation.current.beta, betaRad, smoothFactor);
-        smoothedOrientation.current.gamma = THREE.MathUtils.lerp(smoothedOrientation.current.gamma, gammaRad, smoothFactor);
-    };
+      // Создание матрицы вращения
+      const rotationMatrix = new THREE.Matrix4().makeRotationFromEuler(
+        new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ')
+      );
 
-    const handleAbsoluteOrientation = (event) => {
-        if (event.webkitCompassHeading) {
-            // Для устройств iOS
-            compassHeading.current = event.webkitCompassHeading;
-        } else if (event.alpha !== null) {
-            // Для устройств Android
-            compassHeading.current = 360 - event.alpha;
-        }
-    };
+      // Применение вращения к камере
+      camera.quaternion.setFromRotationMatrix(rotationMatrix);
 
-    useFrame(() => {
-        if (isAccelerometerMode && userLocation) {
-            const currentTime = Date.now();
-            if (currentTime - lastUpdateTime.current < updateInterval) return;
-            lastUpdateTime.current = currentTime;
+      // Учет географического положения пользователя
+      const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
+      const latitudeRotation = THREE.MathUtils.degToRad(90 - userLocation.latitude);
 
-            if (currentTime - lastCalibrationTime.current > calibrationInterval) {
-                calibrateOrientation();
-            }
+      camera.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), -siderealTime);
+      camera.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), -latitudeRotation);
+    }
+  });
 
-            // Создаем матрицу вращения на основе данных ориентации устройства
-            const rotationMatrix = new THREE.Matrix4().makeRotationFromEuler(
-                new THREE.Euler(
-                    smoothedOrientation.current.beta,
-                    smoothedOrientation.current.alpha,
-                    -smoothedOrientation.current.gamma,
-                    'YXZ'
-                )
-            );
-
-            // Применяем вращение к камере
-            camera.quaternion.setFromRotationMatrix(rotationMatrix);
-
-            // Рассчитываем и применяем поворот камеры в зависимости от местоположения и времени
-            const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
-            const latitudeRotation = THREE.MathUtils.degToRad(90 - userLocation.latitude);
-
-            // Учитываем компасное направление
-            const compassRotation = THREE.MathUtils.degToRad(compassHeading.current);
-
-            camera.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), -siderealTime - compassRotation);
-            camera.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), -latitudeRotation);
-
-            if (!isCalibrated) {
-                calibrateOrientation();
-            }
-        }
-    });
-
-    const calibrateOrientation = () => {
-        setIsCalibrating(true);
-        
-        // Сбрасываем начальную ориентацию
-        initialOrientation.current = null;
-
-        setIsCalibrated(true);
-        lastCalibrationTime.current = Date.now();
-        
-        setTimeout(() => {
-            setIsCalibrating(false);
-        }, 3000);
-    };
-
-    return (
-        <>
-            {isCalibrating && (
-                <Html center>
-                    <div style={{
-                        background: 'rgba(0, 0, 0, 0.7)',
-                        color: 'white',
-                        padding: '20px',
-                        borderRadius: '10px'
-                    }}>
-                        Калибровка...
-                    </div>
-                </Html>
-            )}
-            <Text
-                position={[0, 2, -5]}
-                color="white"
-                fontSize={0.5}
-                anchorX="center"
-                anchorY="middle"
-            >
-                {isCalibrated ? 'Калибровка завершена' : 'Требуется калибровка'}
-            </Text>
-        </>
-    );
+  return null;
 }
 
 function calculateSiderealTime(longitude, date) {
-    const J2000 = new Date('2000-01-01T12:00:00Z');
-    const julianDays = (date - J2000) / (1000 * 60 * 60 * 24);
-    const centuries = julianDays / 36525;
+  const J2000 = new Date('2000-01-01T12:00:00Z');
+  const julianDays = (date - J2000) / (1000 * 60 * 60 * 24);
+  const centuries = julianDays / 36525;
 
-    let siderealTime = 280.46061837 + 360.98564736629 * julianDays +
-                       0.000387933 * centuries * centuries -
-                       centuries * centuries * centuries / 38710000;
-    siderealTime = siderealTime % 360;
+  let siderealTime = 280.46061837 + 360.98564736629 * julianDays +
+                     0.000387933 * centuries * centuries -
+                     centuries * centuries * centuries / 38710000;
+  siderealTime = siderealTime % 360;
 
-    return THREE.MathUtils.degToRad(siderealTime + longitude);
+  return THREE.MathUtils.degToRad(siderealTime + longitude);
 }
 
 export default StarMapController;
