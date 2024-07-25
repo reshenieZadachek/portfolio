@@ -4,7 +4,6 @@ import { OrbitControls, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 import StarMapController from '../components/StarMap/CameraController';
 
-
 const toSpherical = (radius, ra, dec) => {
   const theta = (ra * Math.PI) / 12;
   const phi = ((90 - dec) * Math.PI) / 180;
@@ -129,7 +128,6 @@ const constellations = [
   },
 ];
 
-
 const Star = React.memo(({ position, size, color, hovered, onClick, onPointerOver, onPointerOut }) => {
   return (
     <mesh
@@ -175,6 +173,8 @@ function StarMap() {
   const [isAccelerometerMode, setIsAccelerometerMode] = useState(false);
   const [deviceOrientation, setDeviceOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
   const [userLocation, setUserLocation] = useState(null);
+  const [manualAdjustment, setManualAdjustment] = useState({ x: 0, y: 0 });
+  const [isCalibrating, setIsCalibrating] = useState(false);
   const starMapRef = useRef(null);
   const orbitControlsRef = useRef(null);
   const starSize = 3;
@@ -217,17 +217,13 @@ function StarMap() {
       return () => clearTimeout(timer);
     }
   }, [infoVisible]);
-  
 
   const toggleAccelerometerMode = useCallback(() => {
     setIsAccelerometerMode(prev => !prev);
   }, []);
 
-
-
   useEffect(() => {
     if (isAccelerometerMode) {
-      // Запрашиваем геолокацию пользователя
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setUserLocation({
@@ -239,7 +235,6 @@ function StarMap() {
         { enableHighAccuracy: true }
       );
 
-      // Обработчик ориентации устройства
       const handleOrientation = (event) => {
         setDeviceOrientation({
           alpha: event.alpha || 0,
@@ -248,7 +243,6 @@ function StarMap() {
         });
       };
 
-      // Запрашиваем разрешение на использование датчиков устройства
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
           .then(permissionState => {
@@ -268,10 +262,36 @@ function StarMap() {
       };
     }
   }, [isAccelerometerMode]);
+
+  const handleManualAdjustment = useCallback((axis, value) => {
+    setManualAdjustment(prev => ({
+      ...prev,
+      [axis]: prev[axis] + value
+    }));
+  }, []);
+
+  const calibrateOrientation = useCallback(() => {
+    setIsCalibrating(true);
+    // Здесь должна быть логика калибровки
+    setTimeout(() => {
+      setIsCalibrating(false);
+    }, 3000); // Имитация процесса калибровки в течение 3 секунд
+  }, []);
+
+  const buttonStyle = {
+    padding: '10px 20px',
+    fontSize: '16px',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    color: 'white',
+    border: '1px solid white',
+    borderRadius: '5px',
+    cursor: 'pointer'
+  };
+
   return (
     <div ref={starMapRef} style={{ position: 'relative', height: '600px', width: '100%' }}>
       <Canvas style={{ background: 'black' }}>
-      {!isAccelerometerMode && (
+        {!isAccelerometerMode && (
           <OrbitControls 
             ref={orbitControlsRef}
             enableRotate={!isAccelerometerMode}
@@ -283,6 +303,8 @@ function StarMap() {
           isAccelerometerMode={isAccelerometerMode}
           deviceOrientation={deviceOrientation}
           userLocation={userLocation}
+          manualAdjustment={manualAdjustment}
+          isCalibrating={isCalibrating}
         />
         <ambientLight intensity={0.5} />
         <Stars
@@ -319,6 +341,7 @@ function StarMap() {
           </group>
         ))}
       </Canvas>
+      
       <div style={{
         position: 'absolute',
         top: '10px',
@@ -332,26 +355,10 @@ function StarMap() {
         alignItems: 'flex-start',
         gap: '10px'
       }}>
-        <button onClick={toggleFullScreen} style={{ 
-          padding: '10px 20px',
-          fontSize: '16px',
-          backgroundColor: 'transparent',
-          color: 'white',
-          border: '1px solid white',
-          borderRadius: '5px',
-          cursor: 'pointer'
-        }}>
+        <button onClick={toggleFullScreen} style={buttonStyle}>
           {isFullScreen ? 'Свернуть' : 'На весь экран'}
         </button>
-        <button onClick={toggleAccelerometerMode} style={{ 
-          padding: '10px 20px',
-          fontSize: '16px',
-          backgroundColor: 'transparent',
-          color: 'white',
-          border: '1px solid white',
-          borderRadius: '5px',
-          cursor: 'pointer'
-        }}>
+        <button onClick={toggleAccelerometerMode} style={buttonStyle}>
           {isAccelerometerMode ? 'Выключить акселерометр' : 'Включить акселерометр'}
         </button>
         <p style={{ margin: 0, fontSize: '12px' }}>
@@ -361,6 +368,41 @@ function StarMap() {
         </p>
         <p style={{ margin: 0, fontSize: '12px' }}>Нажмите на звезду созвездия, чтобы увидеть информацию о нем</p>
       </div>
+
+      {isAccelerometerMode && (
+        <div style={{
+          position: 'absolute',
+          bottom: '20px',
+          right: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          zIndex: 1000
+        }}>
+          <button onClick={() => handleManualAdjustment('y', 0.1)} style={buttonStyle}>Повернуть вправо</button>
+          <button onClick={() => handleManualAdjustment('y', -0.1)} style={buttonStyle}>Повернуть влево</button>
+          <button onClick={() => handleManualAdjustment('x', 0.1)} style={buttonStyle}>Повернуть вверх</button>
+          <button onClick={() => handleManualAdjustment('x', -0.1)} style={buttonStyle}>Повернуть вниз</button>
+          <button onClick={calibrateOrientation} style={buttonStyle}>Перекалибровать</button>
+        </div>
+      )}
+
+      {isCalibrating && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: 'rgba(0, 0, 0, 0.7)',
+          color: 'white',
+          padding: '20px',
+          borderRadius: '10px',
+          zIndex: 1000
+        }}>
+          Калибровка...
+        </div>
+      )}
+
       {selectedConstellation && infoVisible && (
         <div style={{
           position: 'absolute',
