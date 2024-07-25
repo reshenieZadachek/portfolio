@@ -7,7 +7,7 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
   const lastUpdateTime = useRef(Date.now());
   const updateInterval = 16; // ~60 fps
   const smoothFactor = 0.1;
-  const smoothedOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
+  const smoothedOrientation = useRef({ x: 0, y: 0, z: 0 });
   const initialOrientation = useRef(null);
 
   useEffect(() => {
@@ -23,33 +23,38 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
       lastUpdateTime.current = currentTime;
 
       if (!initialOrientation.current) {
-        initialOrientation.current = { ...deviceOrientation };
+        initialOrientation.current = {
+          alpha: deviceOrientation.alpha,
+          beta: deviceOrientation.beta,
+          gamma: deviceOrientation.gamma
+        };
       }
 
-      // Вычисляем относительные углы
-      const alpha = (deviceOrientation.alpha - initialOrientation.current.alpha + 360) % 360;
-      const beta = deviceOrientation.beta - initialOrientation.current.beta;
-      const gamma = deviceOrientation.gamma - initialOrientation.current.gamma;
-
-      // Сглаживание ориентации
-      smoothedOrientation.current.alpha = THREE.MathUtils.lerp(smoothedOrientation.current.alpha, alpha, smoothFactor);
-      smoothedOrientation.current.beta = THREE.MathUtils.lerp(smoothedOrientation.current.beta, beta, smoothFactor);
-      smoothedOrientation.current.gamma = THREE.MathUtils.lerp(smoothedOrientation.current.gamma, gamma, smoothFactor);
-
-      // Преобразование углов в радианы
-      const alphaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.alpha);
-      const betaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.beta);
-      const gammaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.gamma);
-
-      // Создание матрицы вращения
-      const rotationMatrix = new THREE.Matrix4().makeRotationFromEuler(
-        new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ')
+      // Преобразуем ориентацию устройства в вектор направления
+      const direction = new THREE.Vector3(
+        Math.cos(THREE.MathUtils.degToRad(deviceOrientation.alpha)) * Math.cos(THREE.MathUtils.degToRad(deviceOrientation.beta)),
+        Math.sin(THREE.MathUtils.degToRad(deviceOrientation.beta)),
+        Math.sin(THREE.MathUtils.degToRad(deviceOrientation.alpha)) * Math.cos(THREE.MathUtils.degToRad(deviceOrientation.beta))
       );
 
-      // Применение вращения к камере
-      camera.quaternion.setFromRotationMatrix(rotationMatrix);
+      // Нормализуем вектор
+      direction.normalize();
 
-      // Учет географического положения пользователя
+      // Применяем сглаживание
+      smoothedOrientation.current.x = THREE.MathUtils.lerp(smoothedOrientation.current.x, direction.x, smoothFactor);
+      smoothedOrientation.current.y = THREE.MathUtils.lerp(smoothedOrientation.current.y, direction.y, smoothFactor);
+      smoothedOrientation.current.z = THREE.MathUtils.lerp(smoothedOrientation.current.z, direction.z, smoothFactor);
+
+      // Создаем кватернион из сглаженного направления
+      const quaternion = new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 0, -1),
+        new THREE.Vector3(smoothedOrientation.current.x, smoothedOrientation.current.y, smoothedOrientation.current.z)
+      );
+
+      // Применяем вращение к камере
+      camera.quaternion.copy(quaternion);
+
+      // Учитываем географическое положение пользователя
       const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
       const latitudeRotation = THREE.MathUtils.degToRad(90 - userLocation.latitude);
 
