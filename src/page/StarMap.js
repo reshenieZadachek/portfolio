@@ -346,6 +346,13 @@ function StarMap() {
   return (
     <div ref={starMapRef} style={{ position: 'relative', height: '600px', width: '100%' }}>
       <Canvas style={{ background: 'black' }}>
+      {!isAccelerometerMode && (
+          <OrbitControls 
+            enableRotate={true}
+            enablePan={true}
+            enableZoom={true}
+          />
+        )}
       <PerspectiveCamera makeDefault position={[0, 0, 0]} />
         <StarMapController 
           isAccelerometerMode={isAccelerometerMode}
