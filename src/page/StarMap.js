@@ -225,6 +225,7 @@ function StarMap() {
 
   useEffect(() => {
     if (isAccelerometerMode) {
+      // Запрашиваем геолокацию пользователя
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setUserLocation({
@@ -236,14 +237,7 @@ function StarMap() {
         { enableHighAccuracy: true }
       );
 
-      const handleOrientation = (event) => {
-        setDeviceOrientation({
-          alpha: event.alpha || 0,
-          beta: event.beta || 0,
-          gamma: event.gamma || 0
-        });
-      };
-
+      // Запрашиваем разрешение на использование датчиков устройства
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
           .then(permissionState => {
@@ -263,7 +257,13 @@ function StarMap() {
       };
     }
   }, [isAccelerometerMode]);
-
+  const handleOrientation = useCallback((event) => {
+    setDeviceOrientation({
+      alpha: event.alpha || 0,
+      beta: event.beta || 0,
+      gamma: event.gamma || 0
+    });
+  }, []);
   const handleManualAdjustment = useCallback((axis, value) => {
     setManualAdjustment(prev => ({
       ...prev,
@@ -307,9 +307,6 @@ function StarMap() {
           isAccelerometerMode={isAccelerometerMode}
           deviceOrientation={deviceOrientation}
           userLocation={userLocation}
-          manualAdjustment={manualAdjustment}
-          isCalibrating={isCalibrating}
-          sensitivity={sensitivity}
         />
         <ambientLight intensity={0.5} />
         <Stars
@@ -384,26 +381,7 @@ function StarMap() {
           gap: '10px',
           zIndex: 1000
         }}>
-          <button onClick={() => handleManualAdjustment('y', 0.1)} style={buttonStyle}>Повернуть вправо</button>
-          <button onClick={() => handleManualAdjustment('y', -0.1)} style={buttonStyle}>Повернуть влево</button>
-          <button onClick={() => handleManualAdjustment('x', 0.1)} style={buttonStyle}>Повернуть вверх</button>
-          <button onClick={() => handleManualAdjustment('x', -0.1)} style={buttonStyle}>Повернуть вниз</button>
-          <button onClick={() => handleManualAdjustment('z', 0.1)} style={buttonStyle}>Повернуть по часовой</button>
-          <button onClick={() => handleManualAdjustment('z', -0.1)} style={buttonStyle}>Повернуть против часовой</button>
           <button onClick={calibrateOrientation} style={buttonStyle}>Перекалибровать</button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <label htmlFor="sensitivity" style={{ color: 'white' }}>Чувствительность:</label>
-            <input
-              id="sensitivity"
-              type="range"
-              min="0.1"
-              max="2"
-              step="0.1"
-              value={sensitivity}
-              onChange={handleSensitivityChange}
-              style={{ width: '100px' }}
-            />
-          </div>
         </div>
       )}
 

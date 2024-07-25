@@ -7,14 +7,12 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
     const { scene, camera } = useThree();
     const lastUpdateTime = useRef(Date.now());
     const updateInterval = 16; // ~60 fps
-    const smoothFactor = 0.05; // Уменьшен для более плавного движения
+    const smoothFactor = 0.1; // Увеличено для более быстрого отклика
     const [isCalibrated, setIsCalibrated] = useState(false);
     const [isCalibrating, setIsCalibrating] = useState(false);
-    const [calibrationOffset, setCalibrationOffset] = useState({ x: 0, y: 0, z: 0 });
     const lastCalibrationTime = useRef(Date.now());
     const calibrationInterval = 5 * 60 * 1000; // 5 минут
     const smoothedOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
-    const lowPassFilter = useRef({ x: 0, y: 0, z: 0 });
 
     useEffect(() => {
         if (isAccelerometerMode && userLocation) {
@@ -22,14 +20,14 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
                 DeviceOrientationEvent.requestPermission()
                     .then(permissionState => {
                         if (permissionState === 'granted') {
-                            window.addEventListener('deviceorientation', handleOrientation);
+                            window.addEventListener('deviceorientation', handleOrientation, true);
                         } else {
                             console.error('Отказано в доступе к ориентации устройства');
                         }
                     })
                     .catch(console.error);
             } else {
-                window.addEventListener('deviceorientation', handleOrientation);
+                window.addEventListener('deviceorientation', handleOrientation, true);
             }
 
             // Устанавливаем начальное положение камеры
@@ -38,7 +36,7 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
             camera.lookAt(0, 0, 1);
 
             return () => {
-                window.removeEventListener('deviceorientation', handleOrientation);
+                window.removeEventListener('deviceorientation', handleOrientation, true);
             };
         } else {
             // Сброс вращения сцены при выключении акселерометра
@@ -48,15 +46,15 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
     }, [isAccelerometerMode, userLocation, scene, camera]);
 
     const handleOrientation = (event) => {
-        // Сглаживание данных ориентации
-        smoothedOrientation.current.alpha = smoothedOrientation.current.alpha * (1 - smoothFactor) + event.alpha * smoothFactor;
-        smoothedOrientation.current.beta = smoothedOrientation.current.beta * (1 - smoothFactor) + event.beta * smoothFactor;
-        smoothedOrientation.current.gamma = smoothedOrientation.current.gamma * (1 - smoothFactor) + event.gamma * smoothFactor;
+        // Преобразуем углы в радианы
+        const alpha = THREE.MathUtils.degToRad(event.alpha || 0);
+        const beta = THREE.MathUtils.degToRad(event.beta || 0);
+        const gamma = THREE.MathUtils.degToRad(event.gamma || 0);
 
-        // Применение низкочастотного фильтра
-        lowPassFilter.current.x = lowPassFilter.current.x * 0.9 + smoothedOrientation.current.beta * 0.1;
-        lowPassFilter.current.y = lowPassFilter.current.y * 0.9 + smoothedOrientation.current.alpha * 0.1;
-        lowPassFilter.current.z = lowPassFilter.current.z * 0.9 + smoothedOrientation.current.gamma * 0.1;
+        // Применяем сглаживание
+        smoothedOrientation.current.alpha = smoothedOrientation.current.alpha * (1 - smoothFactor) + alpha * smoothFactor;
+        smoothedOrientation.current.beta = smoothedOrientation.current.beta * (1 - smoothFactor) + beta * smoothFactor;
+        smoothedOrientation.current.gamma = smoothedOrientation.current.gamma * (1 - smoothFactor) + gamma * smoothFactor;
     };
 
     useFrame(() => {
@@ -69,28 +67,25 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
                 calibrateOrientation();
             }
 
-            // Преобразование углов ориентации в кватернион
-            const q = new THREE.Quaternion().setFromEuler(
+            // Создаем матрицу вращения на основе данных ориентации устройства
+            const rotationMatrix = new THREE.Matrix4().makeRotationFromEuler(
                 new THREE.Euler(
-                    THREE.MathUtils.degToRad(lowPassFilter.current.x + calibrationOffset.x),
-                    THREE.MathUtils.degToRad(-(lowPassFilter.current.y + calibrationOffset.y)),
-                    THREE.MathUtils.degToRad(-(lowPassFilter.current.z + calibrationOffset.z)),
+                    smoothedOrientation.current.beta,
+                    smoothedOrientation.current.alpha,
+                    -smoothedOrientation.current.gamma,
                     'YXZ'
                 )
             );
 
-            // Плавное вращение камеры
-            camera.quaternion.slerp(q, smoothFactor);
+            // Применяем вращение к камере
+            camera.quaternion.setFromRotationMatrix(rotationMatrix);
 
-            // Расчет сидерического времени и вращение сцены
+            // Рассчитываем и применяем поворот сцены в зависимости от местоположения и времени
             const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
             const latitudeRotation = THREE.MathUtils.degToRad(90 - userLocation.latitude);
 
-            scene.rotation.y = -siderealTime;
+            scene.rotation.y = siderealTime;
             scene.rotation.x = latitudeRotation;
-
-            // Убираем ограничения на "полюсах"
-            camera.rotation.x = THREE.MathUtils.clamp(camera.rotation.x, -Math.PI / 2, Math.PI / 2);
 
             if (!isCalibrated) {
                 calibrateOrientation();
@@ -101,21 +96,7 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
     const calibrateOrientation = () => {
         setIsCalibrating(true);
         
-        // Используем текущие показания датчиков как базовые
-        const baseOrientation = {
-            x: lowPassFilter.current.x,
-            y: lowPassFilter.current.y,
-            z: lowPassFilter.current.z
-        };
-
-        // Вычисляем отклонение от идеального положения
-        const idealOrientation = calculateIdealOrientation(userLocation);
-        
-        setCalibrationOffset({
-            x: idealOrientation.x - baseOrientation.x,
-            y: idealOrientation.y - baseOrientation.y,
-            z: idealOrientation.z - baseOrientation.z
-        });
+        // Здесь можно добавить дополнительную логику калибровки, если необходимо
 
         setIsCalibrated(true);
         lastCalibrationTime.current = Date.now();
@@ -123,18 +104,6 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
         setTimeout(() => {
             setIsCalibrating(false);
         }, 3000);
-    };
-
-    const calculateIdealOrientation = (location) => {
-        // Вычисляем идеальную ориентацию на основе географического положения
-        const latitude = THREE.MathUtils.degToRad(location.latitude);
-        const longitude = THREE.MathUtils.degToRad(location.longitude);
-
-        return {
-            x: 90 - THREE.MathUtils.radToDeg(latitude), // наклон к горизонту
-            y: THREE.MathUtils.radToDeg(longitude),     // поворот вокруг вертикальной оси
-            z: 0 // нет поворота вокруг оси наблюдения
-        };
     };
 
     return (
