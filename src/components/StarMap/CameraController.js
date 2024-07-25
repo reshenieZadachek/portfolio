@@ -3,8 +3,7 @@ import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 function StarMapController({ isAccelerometerMode, deviceOrientation, userLocation }) {
-  const { scene } = useThree();
-  const sphereRef = useRef();
+  const { camera } = useThree();
   const lastUpdateTime = useRef(Date.now());
   const updateInterval = 16; // ~60 fps
   const smoothFactor = 0.1;
@@ -27,46 +26,44 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
         initialOrientation.current = { ...deviceOrientation };
       }
 
-      // Вычисляем относительные углы
+      // Calculate relative angles
       const alpha = (deviceOrientation.alpha - initialOrientation.current.alpha + 360) % 360;
       const beta = deviceOrientation.beta - initialOrientation.current.beta;
       const gamma = deviceOrientation.gamma - initialOrientation.current.gamma;
 
-      // Сглаживание ориентации
+      // Smooth orientation
       smoothedOrientation.current.alpha = THREE.MathUtils.lerp(smoothedOrientation.current.alpha, alpha, smoothFactor);
       smoothedOrientation.current.beta = THREE.MathUtils.lerp(smoothedOrientation.current.beta, beta, smoothFactor);
       smoothedOrientation.current.gamma = THREE.MathUtils.lerp(smoothedOrientation.current.gamma, gamma, smoothFactor);
 
-      // Преобразование углов в радианы
+      // Convert angles to radians
       const alphaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.alpha);
       const betaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.beta);
       const gammaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.gamma);
 
-      // Создание матрицы вращения
+      // Create rotation matrix
       const rotationMatrix = new THREE.Matrix4().makeRotationFromEuler(
         new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ')
       );
 
-      // Применение вращения к сфере
-      if (sphereRef.current) {
-        sphereRef.current.setRotationFromMatrix(rotationMatrix);
-        
-        // Учет географического положения пользователя
-        const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
-        const latitudeRotation = THREE.MathUtils.degToRad(90 - userLocation.latitude);
+      // Apply rotation to camera
+      camera.quaternion.setFromRotationMatrix(rotationMatrix);
 
-        // Применяем вращение для учета географического положения
-        sphereRef.current.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), -siderealTime);
-        sphereRef.current.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), -latitudeRotation);
-      }
+      // Consider user geographic position
+      const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
+      const latitudeRotation = THREE.MathUtils.degToRad(90 - userLocation.latitude);
+
+      // Apply rotation to consider geographic position
+      camera.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), -siderealTime);
+      camera.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), -latitudeRotation);
+
+      // Fix rotation axis to avoid unwanted rotation
+      const up = new THREE.Vector3(0, 1, 0);
+      camera.up.copy(up);
     }
   });
 
-  return (
-    <group ref={sphereRef}>
-      {/* Все звезды и линии созвездий должны быть внутри этого group */}
-    </group>
-  );
+  return null;
 }
 
 function calculateSiderealTime(longitude, date) {

@@ -171,7 +171,7 @@ function StarMap() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isAccelerometerMode, setIsAccelerometerMode] = useState(false);
   const [deviceOrientation, setDeviceOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
-  const [userLocation, setUserLocation] = useState({ latitude: 0, longitude: 0 });
+  const [userLocation, setUserLocation] = useState(null);
   const starMapRef = useRef(null);
   const constellationRadius = 350;
   const starSize = 3;
@@ -250,64 +250,7 @@ function StarMap() {
       };
     }
   }, [isAccelerometerMode]);
-  useEffect(() => {
-    const handleOrientation = (event) => {
-      setDeviceOrientation({
-        alpha: event.alpha || 0,
-        beta: event.beta || 0,
-        gamma: event.gamma || 0,
-      });
-    };
 
-    // Слушаем события ориентации устройства
-    if (window.DeviceOrientationEvent) {
-      window.addEventListener('deviceorientation', handleOrientation, true);
-    }
-
-    // Очистка события при размонтировании
-    return () => {
-      if (window.DeviceOrientationEvent) {
-        window.removeEventListener('deviceorientation', handleOrientation, true);
-      }
-    };
-  }, []);
-
-  // Эффект для получения местоположения пользователя
-  useEffect(() => {
-    const handleLocation = (position) => {
-      setUserLocation({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      });
-    };
-
-    const handleError = (error) => {
-      console.error("Error getting location:", error);
-    };
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(handleLocation, handleError);
-    }
-  }, []);
-
-  // Определение точек и линий созвездий (пример с данными)
-  const points = useMemo(() => {
-    // Замените этот массив на ваши данные
-    const stars = [
-      { ra: 24 - 11.0622, dec: 61.751 },
-      { ra: 24 - 11.0307, dec: 56.3824 },
-      // Добавьте остальные звезды
-    ];
-    return stars.map(star => toSpherical(50, star.ra, star.dec));
-  }, []);
-
-  const constellationLines = useMemo(() => {
-    // Пример линий для созвездий
-    return [
-      { start: 0, end: 1 },
-      // Добавьте остальные линии
-    ];
-  }, []);
   return (
     <div ref={starMapRef} style={{ position: 'relative', height: '600px', width: '100%' }}>
       <Canvas style={{ background: 'black' }}>
