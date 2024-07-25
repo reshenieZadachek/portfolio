@@ -1,3 +1,4 @@
+// StarMap.js
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Stars, OrbitControls } from '@react-three/drei';
@@ -102,9 +103,9 @@ function StarMap() {
       <Canvas style={{ background: 'black' }}>
         <OrbitControls 
           ref={orbitControlsRef}
-          enableRotate={true}
-          enablePan={true}
-          enableZoom={true}
+          enableRotate={!isAccelerometerMode}
+          enablePan={!isAccelerometerMode}
+          enableZoom={!isAccelerometerMode}
         />
         <StarMapController 
           isAccelerometerMode={isAccelerometerMode}

@@ -11,6 +11,7 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
   const initialOrientation = useRef(null);
   const starsGroup = useRef(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const lastAlpha = useRef(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -27,8 +28,6 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
         scene.add(starsGroup.current);
       }
 
-      camera.position.set(0, 0, 0);
-
       // Move all stars and constellations to the starsGroup
       scene.children.forEach(child => {
         if (child.type === 'Group' && child !== starsGroup.current) {
@@ -37,6 +36,7 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
       });
 
       initialOrientation.current = null;
+      lastAlpha.current = 0;
     } else {
       if (starsGroup.current) {
         // Move all children back to the scene
@@ -62,9 +62,19 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
       }
 
       // Calculate relative angles
-      const alpha = (deviceOrientation.alpha - initialOrientation.current.alpha + 360) % 360;
+      let alpha = deviceOrientation.alpha - initialOrientation.current.alpha;
       const beta = deviceOrientation.beta - initialOrientation.current.beta;
       const gamma = deviceOrientation.gamma - initialOrientation.current.gamma;
+
+      // Prevent sudden 360-degree rotations
+      if (Math.abs(alpha - lastAlpha.current) > 180) {
+        if (alpha > lastAlpha.current) {
+          alpha -= 360;
+        } else {
+          alpha += 360;
+        }
+      }
+      lastAlpha.current = alpha;
 
       // Smooth orientation
       smoothedOrientation.current.alpha = THREE.MathUtils.lerp(smoothedOrientation.current.alpha, alpha, smoothFactor);
