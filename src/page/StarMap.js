@@ -15,6 +15,7 @@ function StarMap() {
   const [deviceOrientation, setDeviceOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
   const [userLocation, setUserLocation] = useState(null);
   const starMapRef = useRef(null);
+  const orbitControlsRef = useRef(null);
 
   const handleConstellationClick = useCallback((constellation) => {
     setSelectedConstellation(constellation);
@@ -50,6 +51,17 @@ function StarMap() {
 
   useEffect(() => {
     if (isAccelerometerMode) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        },
+        (error) => console.error("Ошибка получения местоположения пользователя:", error),
+        { enableHighAccuracy: true }
+      );
+
       const handleOrientation = (event) => {
         setDeviceOrientation({
           alpha: event.alpha || 0,
@@ -65,6 +77,7 @@ function StarMap() {
               window.addEventListener('deviceorientation', handleOrientation, true);
             } else {
               console.error('Отказано в доступе к ориентации устройства');
+              setIsAccelerometerMode(false);
             }
           })
           .catch(console.error);
@@ -78,16 +91,21 @@ function StarMap() {
     }
   }, [isAccelerometerMode]);
 
+  useEffect(() => {
+    if (orbitControlsRef.current) {
+      orbitControlsRef.current.enabled = !isAccelerometerMode;
+    }
+  }, [isAccelerometerMode]);
+
   return (
     <div ref={starMapRef} style={{ position: 'relative', height: '600px', width: '100%' }}>
       <Canvas style={{ background: 'black' }}>
-        {!isAccelerometerMode && (
-          <OrbitControls 
-            enableRotate={true}
-            enablePan={true}
-            enableZoom={true}
-          />
-        )}
+        <OrbitControls 
+          ref={orbitControlsRef}
+          enableRotate={true}
+          enablePan={true}
+          enableZoom={true}
+        />
         <StarMapController 
           isAccelerometerMode={isAccelerometerMode}
           deviceOrientation={deviceOrientation}
