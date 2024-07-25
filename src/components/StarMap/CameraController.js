@@ -7,7 +7,7 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
     const { camera } = useThree();
     const lastUpdateTime = useRef(Date.now());
     const updateInterval = 16; // ~60 fps
-    const smoothFactor = 0.1;
+    const smoothFactor = 0.05; // Уменьшено для более плавного движения
     const [isCalibrated, setIsCalibrated] = useState(false);
     const [isCalibrating, setIsCalibrating] = useState(false);
     const lastCalibrationTime = useRef(Date.now());
@@ -34,24 +34,16 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
                 window.addEventListener('deviceorientationabsolute', handleAbsoluteOrientation, true);
             }
 
-            // Устанавливаем начальное положение камеры
-            camera.position.set(0, 0, 0);
-            camera.up.set(0, 1, 0);
-            camera.lookAt(0, 0, 1);
-
             return () => {
                 window.removeEventListener('deviceorientation', handleOrientation, true);
                 window.removeEventListener('deviceorientationabsolute', handleAbsoluteOrientation, true);
             };
         } else {
-            // Сброс положения камеры при выключении акселерометра
-            camera.position.set(0, 0, 0);
-            camera.up.set(0, 1, 0);
-            camera.lookAt(0, 0, 1);
-            setIsCalibrated(false);
+            // Сброс ориентации при выключении акселерометра
             initialOrientation.current = null;
+            smoothedOrientation.current = { alpha: 0, beta: 0, gamma: 0 };
         }
-    }, [isAccelerometerMode, userLocation, camera]);
+    }, [isAccelerometerMode, userLocation]);
 
     const handleOrientation = (event) => {
         if (!initialOrientation.current) {
@@ -78,9 +70,9 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
         const gammaRad = THREE.MathUtils.degToRad(gamma);
 
         // Применяем сглаживание
-        smoothedOrientation.current.alpha = smoothedOrientation.current.alpha * (1 - smoothFactor) + alphaRad * smoothFactor;
-        smoothedOrientation.current.beta = smoothedOrientation.current.beta * (1 - smoothFactor) + betaRad * smoothFactor;
-        smoothedOrientation.current.gamma = smoothedOrientation.current.gamma * (1 - smoothFactor) + gammaRad * smoothFactor;
+        smoothedOrientation.current.alpha = THREE.MathUtils.lerp(smoothedOrientation.current.alpha, alphaRad, smoothFactor);
+        smoothedOrientation.current.beta = THREE.MathUtils.lerp(smoothedOrientation.current.beta, betaRad, smoothFactor);
+        smoothedOrientation.current.gamma = THREE.MathUtils.lerp(smoothedOrientation.current.gamma, gammaRad, smoothFactor);
     };
 
     const handleAbsoluteOrientation = (event) => {

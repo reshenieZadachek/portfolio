@@ -178,10 +178,13 @@ function StarMap() {
   const orbitControlsRef = useRef(null);
   const [manualAdjustment, setManualAdjustment] = useState({ x: 0, y: 0, z: 0 });
   const [sensitivity, setSensitivity] = useState(1);
+  const [cameraRotation, setCameraRotation] = useState(new THREE.Euler());
   const starSize = 3;
   const starColor = '#FFFFFF';
   const lineColor = '#4169E1'; 
-
+  const handleCameraRotation = useCallback((rotation) => {
+    setCameraRotation(rotation);
+  }, []);
   const handleConstellationClick = useCallback((constellation) => {
     setSelectedConstellation(constellation);
     setInfoVisible(true);
@@ -295,53 +298,58 @@ function StarMap() {
   return (
     <div ref={starMapRef} style={{ position: 'relative', height: '600px', width: '100%' }}>
       <Canvas style={{ background: 'black' }}>
-        {!isAccelerometerMode && (
-          <OrbitControls 
-            ref={orbitControlsRef}
-            enableRotate={!isAccelerometerMode}
-            enablePan={!isAccelerometerMode}
-            enableZoom={!isAccelerometerMode}
-          />
-        )}
+        <OrbitControls 
+          ref={orbitControlsRef}
+          enableRotate={!isAccelerometerMode}
+          enablePan={!isAccelerometerMode}
+          enableZoom={!isAccelerometerMode}
+          onChange={(e) => {
+            if (!isAccelerometerMode) {
+              handleCameraRotation(e.target.object.rotation);
+            }
+          }}
+        />
         <StarMapController 
           isAccelerometerMode={isAccelerometerMode}
           deviceOrientation={deviceOrientation}
           userLocation={userLocation}
         />
-        <ambientLight intensity={0.5} />
-        <Stars
-          radius={130}
-          depth={60}
-          count={10000}
-          factor={4}
-          saturation={0}
-          fade
-        />
-        {constellations.map((constellation, idx) => (
-          <group key={idx}>
-            {constellation.stars.map((star, starIdx) => {
-              const position = toSpherical(constellationRadius, star.ra, star.dec);
-              return (
-                <Star
-                  key={starIdx}
-                  position={position.toArray()}
-                  size={starSize}
-                  color={starColor}
-                  hovered={hoveredConstellation === constellation}
-                  onClick={() => handleConstellationClick(constellation)}
-                  onPointerOver={() => handleStarHover(constellation)}
-                  onPointerOut={() => handleStarHover(null)}
-                />
-              );
-            })}
-            <ConstellationLines 
-              stars={constellation.stars}
-              lines={constellation.lines}
-              radius={constellationRadius} 
-              color={lineColor}
-            />
-          </group>
-        ))}
+        <group rotation={cameraRotation}>
+          <ambientLight intensity={0.5} />
+          <Stars
+            radius={130}
+            depth={60}
+            count={10000}
+            factor={4}
+            saturation={0}
+            fade
+          />
+          {constellations.map((constellation, idx) => (
+            <group key={idx}>
+              {constellation.stars.map((star, starIdx) => {
+                const position = toSpherical(constellationRadius, star.ra, star.dec);
+                return (
+                  <Star
+                    key={starIdx}
+                    position={position.toArray()}
+                    size={starSize}
+                    color={starColor}
+                    hovered={hoveredConstellation === constellation}
+                    onClick={() => handleConstellationClick(constellation)}
+                    onPointerOver={() => handleStarHover(constellation)}
+                    onPointerOut={() => handleStarHover(null)}
+                  />
+                );
+              })}
+              <ConstellationLines 
+                stars={constellation.stars}
+                lines={constellation.lines}
+                radius={constellationRadius} 
+                color={lineColor}
+              />
+            </group>
+          ))}
+        </group>
       </Canvas>
       
       <div style={{
