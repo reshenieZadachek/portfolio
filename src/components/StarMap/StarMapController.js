@@ -6,7 +6,7 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
   const { camera, scene } = useThree();
   const lastUpdateTime = useRef(Date.now());
   const updateInterval = 16; // ~60 fps
-  const smoothFactor = 0.1;
+  const smoothFactor = 0.05; // Reduced from 0.1 to 0.05 for smoother transitions
   const smoothedOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
   const initialOrientation = useRef(null);
   const starsGroup = useRef(null);
@@ -71,20 +71,18 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
 
       // Calculate relative angles
       let alpha = deviceOrientation.alpha - initialOrientation.current.alpha;
-      const beta = deviceOrientation.beta - initialOrientation.current.beta;
-      const gamma = deviceOrientation.gamma - initialOrientation.current.gamma;
+      let beta = deviceOrientation.beta - initialOrientation.current.beta;
+      let gamma = deviceOrientation.gamma - initialOrientation.current.gamma;
 
-      // Prevent sudden 360-degree rotations
-      if (Math.abs(alpha - lastAlpha.current) > 180) {
-        if (alpha > lastAlpha.current) {
-          alpha -= 360;
-        } else {
-          alpha += 360;
-        }
-      }
-      lastAlpha.current = alpha;
+      // Normalize angles to [-180, 180] range
+      alpha = ((alpha % 360) + 360) % 360;
+      beta = ((beta % 360) + 360) % 360;
+      gamma = ((gamma % 360) + 360) % 360;
+      if (alpha > 180) alpha -= 360;
+      if (beta > 180) beta -= 360;
+      if (gamma > 180) gamma -= 360;
 
-      // Smooth orientation
+      // Smooth orientation with lower smoothFactor
       smoothedOrientation.current.alpha = THREE.MathUtils.lerp(smoothedOrientation.current.alpha, alpha, smoothFactor);
       smoothedOrientation.current.beta = THREE.MathUtils.lerp(smoothedOrientation.current.beta, beta, smoothFactor);
       smoothedOrientation.current.gamma = THREE.MathUtils.lerp(smoothedOrientation.current.gamma, gamma, smoothFactor);
@@ -94,17 +92,13 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
       const betaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.beta);
       const gammaRad = THREE.MathUtils.degToRad(smoothedOrientation.current.gamma);
 
-      // Update rotation axis based on device orientation
-      rotationAxis.current.set(
-        Math.sin(gammaRad) * Math.cos(alphaRad) - Math.sin(betaRad) * Math.cos(gammaRad) * Math.sin(alphaRad),
-        Math.sin(betaRad) * Math.sin(alphaRad) + Math.sin(gammaRad) * Math.cos(betaRad) * Math.cos(alphaRad),
-        Math.cos(betaRad) * Math.cos(gammaRad)
+      // Create a rotation matrix from Euler angles
+      const rotationMatrix = new THREE.Matrix4().makeRotationFromEuler(
+        new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ')
       );
 
-      // Rotate camera around the calculated axis
-      const rotationAngle = Math.sqrt(alphaRad * alphaRad + betaRad * betaRad + gammaRad * gammaRad);
-      camera.position.applyAxisAngle(rotationAxis.current, rotationAngle);
-      camera.lookAt(new THREE.Vector3(0, 0, 0));
+      // Apply rotation to camera
+      camera.quaternion.setFromRotationMatrix(rotationMatrix);
 
       // Update star positions based on current time and location
       if (starsGroup.current) {
