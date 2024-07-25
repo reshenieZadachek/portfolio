@@ -173,10 +173,11 @@ function StarMap() {
   const [isAccelerometerMode, setIsAccelerometerMode] = useState(false);
   const [deviceOrientation, setDeviceOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
   const [userLocation, setUserLocation] = useState(null);
-  const [manualAdjustment, setManualAdjustment] = useState({ x: 0, y: 0 });
   const [isCalibrating, setIsCalibrating] = useState(false);
   const starMapRef = useRef(null);
   const orbitControlsRef = useRef(null);
+  const [manualAdjustment, setManualAdjustment] = useState({ x: 0, y: 0, z: 0 });
+  const [sensitivity, setSensitivity] = useState(1);
   const starSize = 3;
   const starColor = '#FFFFFF';
   const lineColor = '#4169E1'; 
@@ -266,8 +267,11 @@ function StarMap() {
   const handleManualAdjustment = useCallback((axis, value) => {
     setManualAdjustment(prev => ({
       ...prev,
-      [axis]: prev[axis] + value
+      [axis]: prev[axis] + value * sensitivity
     }));
+  }, [sensitivity]);
+  const handleSensitivityChange = useCallback((event) => {
+    setSensitivity(parseFloat(event.target.value));
   }, []);
 
   const calibrateOrientation = useCallback(() => {
@@ -291,7 +295,7 @@ function StarMap() {
   return (
     <div ref={starMapRef} style={{ position: 'relative', height: '600px', width: '100%' }}>
       <Canvas style={{ background: 'black' }}>
-        {!isAccelerometerMode && (
+      {!isAccelerometerMode && (
           <OrbitControls 
             ref={orbitControlsRef}
             enableRotate={!isAccelerometerMode}
@@ -305,6 +309,7 @@ function StarMap() {
           userLocation={userLocation}
           manualAdjustment={manualAdjustment}
           isCalibrating={isCalibrating}
+          sensitivity={sensitivity}
         />
         <ambientLight intensity={0.5} />
         <Stars
@@ -383,7 +388,22 @@ function StarMap() {
           <button onClick={() => handleManualAdjustment('y', -0.1)} style={buttonStyle}>Повернуть влево</button>
           <button onClick={() => handleManualAdjustment('x', 0.1)} style={buttonStyle}>Повернуть вверх</button>
           <button onClick={() => handleManualAdjustment('x', -0.1)} style={buttonStyle}>Повернуть вниз</button>
+          <button onClick={() => handleManualAdjustment('z', 0.1)} style={buttonStyle}>Повернуть по часовой</button>
+          <button onClick={() => handleManualAdjustment('z', -0.1)} style={buttonStyle}>Повернуть против часовой</button>
           <button onClick={calibrateOrientation} style={buttonStyle}>Перекалибровать</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <label htmlFor="sensitivity" style={{ color: 'white' }}>Чувствительность:</label>
+            <input
+              id="sensitivity"
+              type="range"
+              min="0.1"
+              max="2"
+              step="0.1"
+              value={sensitivity}
+              onChange={handleSensitivityChange}
+              style={{ width: '100px' }}
+            />
+          </div>
         </div>
       )}
 
