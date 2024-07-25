@@ -9,6 +9,10 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
   const updateInterval = 16; // ~60 fps
   const smoothFactor = 0.1; // Коэффициент сглаживания для уменьшения чувствительности
   const [isCalibrated, setIsCalibrated] = useState(false);
+  const [isCalibrating, setIsCalibrating] = useState(false);
+  const [manualAdjustment, setManualAdjustment] = useState({ x: 0, y: 0 });
+  const lastCalibrationTime = useRef(Date.now());
+  const calibrationInterval = 5 * 60 * 1000; // 5 минут
 
   useEffect(() => {
     if (isAccelerometerMode && userLocation) {
@@ -58,14 +62,19 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
       if (currentTime - lastUpdateTime.current < updateInterval) return;
       lastUpdateTime.current = currentTime;
 
+      // Проверяем, нужна ли перекалибровка
+      if (currentTime - lastCalibrationTime.current > calibrationInterval) {
+        calibrateOrientation();
+      }
+
       // Вычисляем текущую ориентацию устройства
       const { alpha, beta, gamma } = deviceOrientation;
       
-      // Преобразуем углы ориентации в кватернион
+      // Преобразуем углы ориентации в кватернион, инвертируя горизонтальную ось
       const q = new THREE.Quaternion().setFromEuler(
         new THREE.Euler(
           THREE.MathUtils.degToRad(beta),
-          THREE.MathUtils.degToRad(alpha),
+          THREE.MathUtils.degToRad(-alpha), // Инвертируем alpha для исправления горизонтальной оси
           THREE.MathUtils.degToRad(-gamma),
           'YXZ'
         )
@@ -86,21 +95,71 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
       const compassCorrection = THREE.MathUtils.degToRad(compassHeading.current);
       scene.rotation.y -= compassCorrection;
 
+      // Применяем ручную корректировку
+      scene.rotation.y += manualAdjustment.y;
+      scene.rotation.x += manualAdjustment.x;
+
       // Если это первый кадр после включения режима, выполняем калибровку
       if (!isCalibrated) {
         calibrateOrientation();
-        setIsCalibrated(true);
       }
     }
   });
 
   const calibrateOrientation = () => {
+    setIsCalibrating(true);
     // Вычисляем начальную ориентацию на основе показаний компаса
     const initialHeading = THREE.MathUtils.degToRad(compassHeading.current);
     scene.rotation.y += initialHeading;
+    setIsCalibrated(true);
+    lastCalibrationTime.current = Date.now();
+    
+    // Имитация процесса калибровки
+    setTimeout(() => {
+      setIsCalibrating(false);
+    }, 3000); // 3 секунды на калибровку
   };
 
-  return null;
+  const handleManualAdjustment = (axis, value) => {
+    setManualAdjustment(prev => ({
+      ...prev,
+      [axis]: prev[axis] + value
+    }));
+  };
+
+  return (
+    <>
+      {isCalibrating && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: 'rgba(0, 0, 0, 0.7)',
+          color: 'white',
+          padding: '20px',
+          borderRadius: '10px',
+          zIndex: 1000
+        }}>
+          Калибровка...
+        </div>
+      )}
+      <div style={{
+        position: 'absolute',
+        bottom: '20px',
+        right: '20px',
+        display: 'flex',
+        flexDirection: 'column',
+        zIndex: 1000
+      }}>
+        <button onClick={() => handleManualAdjustment('y', 0.1)}>Повернуть вправо</button>
+        <button onClick={() => handleManualAdjustment('y', -0.1)}>Повернуть влево</button>
+        <button onClick={() => handleManualAdjustment('x', 0.1)}>Повернуть вверх</button>
+        <button onClick={() => handleManualAdjustment('x', -0.1)}>Повернуть вниз</button>
+        <button onClick={calibrateOrientation}>Перекалибровать</button>
+      </div>
+    </>
+  );
 }
 
 function calculateSiderealTime(longitude, date) {
