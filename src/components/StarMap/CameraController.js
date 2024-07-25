@@ -4,10 +4,10 @@ import { Html, Text } from '@react-three/drei';
 import * as THREE from 'three';
 
 function StarMapController({ isAccelerometerMode, deviceOrientation, userLocation }) {
-    const { scene, camera } = useThree();
+    const { camera } = useThree();
     const lastUpdateTime = useRef(Date.now());
     const updateInterval = 16; // ~60 fps
-    const smoothFactor = 0.1; // Увеличено для более быстрого отклика
+    const smoothFactor = 0.1;
     const [isCalibrated, setIsCalibrated] = useState(false);
     const [isCalibrating, setIsCalibrating] = useState(false);
     const lastCalibrationTime = useRef(Date.now());
@@ -39,11 +39,13 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
                 window.removeEventListener('deviceorientation', handleOrientation, true);
             };
         } else {
-            // Сброс вращения сцены при выключении акселерометра
-            scene.rotation.set(0, 0, 0);
+            // Сброс положения камеры при выключении акселерометра
+            camera.position.set(0, 0, 0);
+            camera.up.set(0, 1, 0);
+            camera.lookAt(0, 0, 1);
             setIsCalibrated(false);
         }
-    }, [isAccelerometerMode, userLocation, scene, camera]);
+    }, [isAccelerometerMode, userLocation, camera]);
 
     const handleOrientation = (event) => {
         // Преобразуем углы в радианы
@@ -80,12 +82,12 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
             // Применяем вращение к камере
             camera.quaternion.setFromRotationMatrix(rotationMatrix);
 
-            // Рассчитываем и применяем поворот сцены в зависимости от местоположения и времени
+            // Рассчитываем и применяем поворот камеры в зависимости от местоположения и времени
             const siderealTime = calculateSiderealTime(userLocation.longitude, new Date());
             const latitudeRotation = THREE.MathUtils.degToRad(90 - userLocation.latitude);
 
-            scene.rotation.y = siderealTime;
-            scene.rotation.x = latitudeRotation;
+            camera.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), -siderealTime);
+            camera.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), -latitudeRotation);
 
             if (!isCalibrated) {
                 calibrateOrientation();
