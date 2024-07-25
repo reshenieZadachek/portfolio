@@ -254,7 +254,7 @@ function StarMap() {
   return (
     <div ref={starMapRef} style={{ position: 'relative', height: '600px', width: '100%' }}>
       <Canvas style={{ background: 'black' }}>
-        {!isAccelerometerMode && (
+      {!isAccelerometerMode && (
           <OrbitControls 
             enableRotate={true}
             enablePan={true}
@@ -309,15 +309,38 @@ function StarMap() {
         position: 'absolute',
         top: '10px',
         left: '10px',
-        color: 'white',
-        background: 'rgba(0, 0, 0, 0.7)',
-        padding: '10px',
-        borderRadius: '5px'
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px'
       }}>
-        <button onClick={toggleFullScreen}>
+        <button
+          onClick={toggleFullScreen}
+          style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            color: 'white',
+            border: 'none',
+            padding: '10px 15px',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: 'bold'
+          }}
+        >
           {isFullScreen ? 'Свернуть' : 'На весь экран'}
         </button>
-        <button onClick={toggleAccelerometerMode}>
+        <button
+          onClick={toggleAccelerometerMode}
+          style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            color: 'white',
+            border: 'none',
+            padding: '10px 15px',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: 'bold'
+          }}
+        >
           {isAccelerometerMode ? 'Выключить акселерометр' : 'Включить акселерометр'}
         </button>
       </div>
