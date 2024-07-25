@@ -8,12 +8,13 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
     const compassHeading = useRef(0);
     const lastUpdateTime = useRef(Date.now());
     const updateInterval = 16; // ~60 fps
-    const smoothFactor = 0.1;
+    const smoothFactor = 0.2; // Increase smooth factor for smoother transitions
     const [isCalibrated, setIsCalibrated] = useState(false);
     const [isCalibrating, setIsCalibrating] = useState(false);
     const [calibrationOffset, setCalibrationOffset] = useState({ x: 0, y: 0, z: 0 });
     const lastCalibrationTime = useRef(Date.now());
     const calibrationInterval = 5 * 60 * 1000; // 5 минут
+    const smoothedOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
 
     useEffect(() => {
         if (isAccelerometerMode && userLocation) {
@@ -50,6 +51,11 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
         } else if (event.alpha !== null) {
             compassHeading.current = 360 - event.alpha;
         }
+
+        // Smooth orientation data
+        smoothedOrientation.current.alpha = smoothedOrientation.current.alpha * (1 - smoothFactor) + event.alpha * smoothFactor;
+        smoothedOrientation.current.beta = smoothedOrientation.current.beta * (1 - smoothFactor) + event.beta * smoothFactor;
+        smoothedOrientation.current.gamma = smoothedOrientation.current.gamma * (1 - smoothFactor) + event.gamma * smoothFactor;
     };
 
     useFrame(() => {
@@ -62,7 +68,7 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
                 calibrateOrientation();
             }
 
-            const { alpha, beta, gamma } = deviceOrientation;
+            const { alpha, beta, gamma } = smoothedOrientation.current;
             
             const q = new THREE.Quaternion().setFromEuler(
                 new THREE.Euler(
@@ -95,9 +101,9 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
         
         // Используем текущие показания датчиков как базовые
         const baseOrientation = {
-            x: deviceOrientation.beta,
-            y: deviceOrientation.alpha,
-            z: deviceOrientation.gamma
+            x: smoothedOrientation.current.beta,
+            y: smoothedOrientation.current.alpha,
+            z: smoothedOrientation.current.gamma
         };
 
         // Вычисляем отклонение от идеального положения
