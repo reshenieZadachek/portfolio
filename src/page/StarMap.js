@@ -104,7 +104,7 @@ function StarMap() {
   }, [isAccelerometerMode]);
 
   return (
-    <div ref={starMapRef} style={{ position: 'relative', height: '600px', width: '100%' }}>
+    <div ref={starMapRef} style={{ position: 'relative', height: '600px', width: '100%', overflow: 'hidden'}}>
       <Canvas style={{ background: 'black' }}>
         <OrbitControls 
           ref={orbitControlsRef}

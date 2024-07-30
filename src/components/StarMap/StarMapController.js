@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -6,7 +6,7 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
   const { camera, scene } = useThree();
   const lastUpdateTime = useRef(Date.now());
   const updateInterval = 16; // ~60 fps
-  const smoothFactor = 0.1; // Increased for more responsive movement
+  const smoothFactor = 0.05;
   const smoothedOrientation = useRef({ alpha: 0, beta: 0, gamma: 0 });
   const initialOrientation = useRef(null);
   const starsGroup = useRef(null);
@@ -28,6 +28,7 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
         scene.add(starsGroup.current);
       }
 
+      // Move all stars and constellations to the starsGroup
       scene.children.forEach(child => {
         if (child.type === 'Group' && child !== starsGroup.current) {
           starsGroup.current.add(child);
@@ -35,22 +36,26 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
       });
 
       initialOrientation.current = null;
+      
+      // Set initial camera position based on user location
       updateCameraPosition(camera, userLocation);
     } else {
       if (starsGroup.current) {
+        // Move all children back to the scene
         while (starsGroup.current.children.length > 0) {
           scene.add(starsGroup.current.children[0]);
         }
         scene.remove(starsGroup.current);
         starsGroup.current = null;
       }
+      // Reset camera position and rotation
       camera.position.set(0, 0, 5);
       camera.lookAt(new THREE.Vector3(0, 0, 0));
     }
   }, [isAccelerometerMode, userLocation, scene, camera]);
 
   useFrame(() => {
-    if (isAccelerometerMode && userLocation && deviceOrientation) {
+    if (isAccelerometerMode && userLocation) {
       const currentTimeMs = Date.now();
       if (currentTimeMs - lastUpdateTime.current < updateInterval) return;
       lastUpdateTime.current = currentTimeMs;
@@ -59,22 +64,31 @@ function StarMapController({ isAccelerometerMode, deviceOrientation, userLocatio
         initialOrientation.current = { ...deviceOrientation };
       }
 
-      let { alpha, beta, gamma } = deviceOrientation;
+      // Calculate relative angles
+      let alpha = deviceOrientation.alpha;
+      let beta = deviceOrientation.beta;
+      let gamma = deviceOrientation.gamma;
 
-      // Normalize angles
+      // Normalize angles to [-180, 180] range
       alpha = ((alpha % 360) + 360) % 360;
-      beta = Math.max(-90, Math.min(90, beta)); // Clamp beta to [-90, 90]
+      beta = ((beta % 360) + 360) % 360;
       gamma = ((gamma % 360) + 360) % 360;
+      if (alpha > 180) alpha -= 360;
+      if (beta > 180) beta -= 360;
+      if (gamma > 180) gamma -= 360;
 
       // Smooth orientation
       smoothedOrientation.current.alpha = THREE.MathUtils.lerp(smoothedOrientation.current.alpha, alpha, smoothFactor);
       smoothedOrientation.current.beta = THREE.MathUtils.lerp(smoothedOrientation.current.beta, beta, smoothFactor);
       smoothedOrientation.current.gamma = THREE.MathUtils.lerp(smoothedOrientation.current.gamma, gamma, smoothFactor);
 
+      // Calculate compass heading
       compassHeading.current = calculateCompassHeading(smoothedOrientation.current.alpha, smoothedOrientation.current.beta, smoothedOrientation.current.gamma);
 
+      // Update camera rotation
       updateCameraRotation(camera, smoothedOrientation.current, compassHeading.current);
 
+      // Update star positions based on current time, location, and compass heading
       if (starsGroup.current) {
         const siderealTime = calculateSiderealTime(userLocation.longitude, currentTime);
         starsGroup.current.rotation.y = -siderealTime - THREE.MathUtils.degToRad(compassHeading.current);
@@ -97,13 +111,16 @@ function updateCameraRotation(camera, orientation, compassHeading) {
   const betaRad = THREE.MathUtils.degToRad(orientation.beta);
   const gammaRad = THREE.MathUtils.degToRad(orientation.gamma);
 
+  // Create a rotation matrix from Euler angles
   const rotationMatrix = new THREE.Matrix4().makeRotationFromEuler(
     new THREE.Euler(betaRad, alphaRad, -gammaRad, 'YXZ')
   );
 
+  // Apply additional rotation for compass heading
   const compassRotation = new THREE.Matrix4().makeRotationY(THREE.MathUtils.degToRad(compassHeading));
   rotationMatrix.multiply(compassRotation);
 
+  // Apply rotation to camera
   camera.quaternion.setFromRotationMatrix(rotationMatrix);
 }
 
