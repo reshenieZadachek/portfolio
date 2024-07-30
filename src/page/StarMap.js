@@ -1,4 +1,3 @@
-// StarMap.js
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Stars, OrbitControls } from '@react-three/drei';
@@ -6,6 +5,7 @@ import ConstellationGroup from '../components/StarMap/ConstellationGroup';
 import StarMapController from '../components/StarMap/StarMapController';
 import ControlPanel from '../components/StarMap/ControlPanel';
 import InfoPanel from '../components/StarMap/InfoPanel';
+import ToggleButton from '../components/StarMap/ToggleButton';
 
 function StarMap() {
   const [selectedConstellation, setSelectedConstellation] = useState(null);
@@ -15,6 +15,7 @@ function StarMap() {
   const [isAccelerometerMode, setIsAccelerometerMode] = useState(false);
   const [deviceOrientation, setDeviceOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
   const [userLocation, setUserLocation] = useState(null);
+  const [buttonsVisible, setButtonsVisible] = useState(true);
   const starMapRef = useRef(null);
   const orbitControlsRef = useRef(null);
 
@@ -40,6 +41,10 @@ function StarMap() {
   const toggleAccelerometerMode = useCallback(() => {
     setIsAccelerometerMode(prev => !prev);
   }, []);
+
+  const toggleButtonsVisibility = () => {
+    setButtonsVisible(prev => !prev);
+  };
 
   useEffect(() => {
     const handleFullScreenChange = () => {
@@ -134,6 +139,12 @@ function StarMap() {
         isAccelerometerMode={isAccelerometerMode}
         onToggleFullScreen={toggleFullScreen}
         onToggleAccelerometerMode={toggleAccelerometerMode}
+        buttonsVisible={buttonsVisible}
+      />
+
+      <ToggleButton
+        onClick={toggleButtonsVisibility}
+        buttonsVisible={buttonsVisible}
       />
 
       <InfoPanel
