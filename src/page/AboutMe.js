@@ -51,6 +51,7 @@ const AboutMe = () => {
       
       <List>
         <ListItem><Strong>Фронтенд:</Strong> HTML5, CSS3, JavaScript (ES6+), React, Styled-components</ListItem>
+        <ListItem><Strong>Стейт менеджеры:</Strong> Redux, MobX</ListItem>
         <ListItem><Strong>Бэкенд:</Strong> Node.js, Express, Sequelize, PostgreSQL</ListItem>
         <ListItem><Strong>Инструменты и оптимизация:</Strong> Webpack, Git, Nginx</ListItem>
         <ListItem><Strong>API и безопасность:</Strong> Axios, JWT, WebSocket</ListItem>
